@@ -972,54 +972,48 @@ export function initCloudRealtimeSync() {
   if (!isCloudFirebaseActive() || !db) return;
 
   try {
-    // 1. Food Listings Sync
+    // 1. Food Listings Sync (Live Multi-Device Updates)
     onSnapshot(collection(db, 'foodListings'), (snapshot) => {
       const items = [];
       snapshot.forEach(docSnap => items.push(docSnap.data()));
-      if (items.length > 0) {
-        saveStorage(STORAGE_KEYS.LISTINGS, items);
-        window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'foodListings' } }));
-      }
+      items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      saveStorage(STORAGE_KEYS.LISTINGS, items);
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'foodListings' } }));
     }, (err) => console.warn('Cloud listings sync listener warning:', err));
 
-    // 2. Donations Sync
+    // 2. Donations Sync (Live Status Updates)
     onSnapshot(collection(db, 'donations'), (snapshot) => {
       const items = [];
       snapshot.forEach(docSnap => items.push(docSnap.data()));
-      if (items.length > 0) {
-        saveStorage(STORAGE_KEYS.DONATIONS, items);
-        window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'donations' } }));
-      }
+      items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      saveStorage(STORAGE_KEYS.DONATIONS, items);
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'donations' } }));
     }, (err) => console.warn('Cloud donations sync listener warning:', err));
 
     // 3. Messages Sync (Live Chat Across Devices)
     onSnapshot(collection(db, 'messages'), (snapshot) => {
       const items = [];
       snapshot.forEach(docSnap => items.push(docSnap.data()));
-      if (items.length > 0) {
-        saveStorage(STORAGE_KEYS.MESSAGES, items);
-        window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'messages' } }));
-      }
+      items.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+      saveStorage(STORAGE_KEYS.MESSAGES, items);
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'messages' } }));
     }, (err) => console.warn('Cloud messages sync listener warning:', err));
 
-    // 4. Notifications Sync
+    // 4. Notifications Sync (Real-time Broadcast to NGOs)
     onSnapshot(collection(db, 'notifications'), (snapshot) => {
       const items = [];
       snapshot.forEach(docSnap => items.push(docSnap.data()));
-      if (items.length > 0) {
-        saveStorage(STORAGE_KEYS.NOTIFICATIONS, items);
-        window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'notifications' } }));
-      }
+      items.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      saveStorage(STORAGE_KEYS.NOTIFICATIONS, items);
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'notifications' } }));
     }, (err) => console.warn('Cloud notifications sync listener warning:', err));
 
-    // 5. Users Sync
+    // 5. Users Sync (Cross-Device Profiles & Credentials)
     onSnapshot(collection(db, 'users'), (snapshot) => {
       const items = [];
       snapshot.forEach(docSnap => items.push(docSnap.data()));
-      if (items.length > 0) {
-        saveStorage(STORAGE_KEYS.USERS, items);
-        window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'users' } }));
-      }
+      saveStorage(STORAGE_KEYS.USERS, items);
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'users' } }));
     }, (err) => console.warn('Cloud users sync listener warning:', err));
   } catch (e) {
     console.warn('Realtime cloud sync error:', e);

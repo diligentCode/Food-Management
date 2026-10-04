@@ -20,6 +20,13 @@ export default function NGOAvailableFoodPage() {
 
   useEffect(() => {
     loadListings();
+    const handleUpdate = () => loadListings();
+    window.addEventListener('foodconnect_data_updated', handleUpdate);
+    const timer = setInterval(loadListings, 2500);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', handleUpdate);
+      clearInterval(timer);
+    };
   }, []);
 
   const handleConfirmAccept = () => {

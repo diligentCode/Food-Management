@@ -23,6 +23,12 @@ export default function DonorTrackingPage() {
 
   useEffect(() => {
     loadDonations();
+    window.addEventListener('foodconnect_data_updated', loadDonations);
+    const interval = setInterval(loadDonations, 3000);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', loadDonations);
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   const handleAdvanceStatus = (nextStatus) => {

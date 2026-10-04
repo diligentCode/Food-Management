@@ -19,6 +19,12 @@ export default function MyListingsPage() {
 
   useEffect(() => {
     loadListings();
+    window.addEventListener('foodconnect_data_updated', loadListings);
+    const interval = setInterval(loadListings, 3000);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', loadListings);
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   const handleDelete = (id) => {

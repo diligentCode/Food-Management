@@ -63,7 +63,8 @@ export default function RegisterPage() {
         city: chosenCity,
         address: address ? `${address}, ${chosenCity}` : chosenCity,
         location: { lat: latitude, lng: longitude },
-        role
+        role,
+        password
       });
 
       if (user.role === 'donor') navigate('/donor');

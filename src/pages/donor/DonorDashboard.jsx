@@ -12,11 +12,21 @@ export default function DonorDashboard() {
   const [listings, setListings] = useState([]);
   const [activeDonations, setActiveDonations] = useState([]);
 
-  useEffect(() => {
+  const loadData = () => {
     if (currentUser) {
       setListings(foodService.getDonorListings(currentUser.id));
       setActiveDonations(donationService.getUserDonations(currentUser.id, 'donor'));
     }
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('foodconnect_data_updated', loadData);
+    const interval = setInterval(loadData, 3000);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', loadData);
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   const activeListingsCount = listings.filter(l => l.status === 'available').length;

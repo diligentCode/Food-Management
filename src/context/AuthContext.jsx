@@ -6,6 +6,16 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { userService } from '../services/dataService';
+import { 
+  auth, 
+  db, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  isCloudFirebaseActive, 
+  doc, 
+  getDoc 
+} from '../services/firebase';
 
 const AuthContext = createContext(null);
 const STORAGE_AUTH_KEY = 'foodconnect_session_user_v2';
@@ -32,12 +42,51 @@ export function AuthProvider({ children }) {
     }
   }, [currentUser]);
 
-  // Login with Email & Password
+  // Login with Email & Password (Multi-Device Cloud Aware)
   const login = async (email, password) => {
     setLoading(true);
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      let cloudUserFound = null;
+
+      // 1. If Cloud Firebase is active, sign in via Firebase Auth
+      if (isCloudFirebaseActive() && auth) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+          if (cred?.user?.uid && db) {
+            // Fetch verified user profile directly from Firestore
+            const docSnap = await getDoc(doc(db, 'users', cred.user.uid));
+            if (docSnap.exists()) {
+              cloudUserFound = docSnap.data();
+            }
+          }
+        } catch (firebaseErr) {
+          if (firebaseErr.code === 'auth/user-not-found' || firebaseErr.code === 'auth/invalid-credential') {
+            throw new Error('Invalid email or password.');
+          } else if (firebaseErr.code === 'auth/wrong-password') {
+            throw new Error('Incorrect password.');
+          }
+          console.warn('Firebase login notice:', firebaseErr);
+        }
+      }
+
+      // If cloud profile found, sync into local cache and authenticate
+      if (cloudUserFound) {
+        const users = userService.getUsers();
+        const idx = users.findIndex(u => u.id === cloudUserFound.id);
+        if (idx !== -1) {
+          users[idx] = cloudUserFound;
+        } else {
+          users.push(cloudUserFound);
+        }
+        localStorage.setItem('foodconnect_users', JSON.stringify(users));
+        setCurrentUser(cloudUserFound);
+        return cloudUserFound;
+      }
+
+      // 2. Fallback to local / synced users directory
       const users = userService.getUsers();
-      const found = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+      const found = users.find(u => u.email.toLowerCase() === cleanEmail);
       if (!found) {
         throw new Error('No registered account found with this email. Please register first.');
       }
@@ -48,24 +97,52 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Register a new Donor or NGO user
+  // Register a new Donor or NGO user (Multi-Device Cloud Aware)
   const register = async (userData) => {
     setLoading(true);
     try {
+      let firebaseUid = null;
+
+      // 1. If Cloud Firebase is active, register through Firebase Auth
+      if (isCloudFirebaseActive() && auth) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(
+            auth, 
+            userData.email.trim(), 
+            userData.password || 'TemporaryPass123'
+          );
+          firebaseUid = userCredential.user.uid;
+        } catch (firebaseErr) {
+          if (firebaseErr.code === 'auth/email-already-in-use') {
+            throw new Error('An account with this email already exists on the cloud. Please sign in.');
+          } else if (firebaseErr.code === 'auth/weak-password') {
+            throw new Error('Password must be at least 6 characters.');
+          } else if (firebaseErr.code === 'auth/invalid-email') {
+            throw new Error('Please enter a valid email address.');
+          } else {
+            console.warn('Firebase registration notice:', firebaseErr);
+          }
+        }
+      }
+
+      // 2. Check local store uniqueness
       const users = userService.getUsers();
       const existing = users.find(u => u.email.toLowerCase() === userData.email.trim().toLowerCase());
-      if (existing) {
+      if (existing && !firebaseUid) {
         throw new Error('An account with this email already exists.');
       }
 
+      // 3. Create user profile in Firestore & local
       const newUser = userService.createUser({
+        id: firebaseUid || undefined,
         name: userData.name || userData.organizationName,
         organizationName: userData.organizationName,
         email: userData.email.trim(),
         phone: userData.phone || '',
         role: userData.role, // strictly 'donor' or 'ngo'
+        city: userData.city || 'Jaipur',
         address: userData.address || '',
-        location: { lat: 26.9124, lng: 75.7873 }
+        location: userData.location || { lat: 26.9124, lng: 75.7873 }
       });
 
       setCurrentUser(newUser);
@@ -121,7 +198,14 @@ export function AuthProvider({ children }) {
   };
 
   // Logout
-  const logout = () => {
+  const logout = async () => {
+    try {
+      if (isCloudFirebaseActive() && auth) {
+        await signOut(auth);
+      }
+    } catch (e) {
+      console.warn('Firebase signout notice:', e);
+    }
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_AUTH_KEY);
   };

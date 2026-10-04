@@ -30,8 +30,13 @@ export default function NGODashboard() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
+    const handleUpdate = () => loadData();
+    window.addEventListener('foodconnect_data_updated', handleUpdate);
+    const interval = setInterval(loadData, 3000);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', handleUpdate);
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   // Handle Accept Donation with optional payment
