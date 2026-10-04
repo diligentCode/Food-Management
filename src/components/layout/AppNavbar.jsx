@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/dataService';
-import { isCloudFirebaseActive, getStoredFirebaseConfig, saveStoredFirebaseConfig } from '../../services/firebase';
-import { getGeminiApiKey, setGeminiApiKey, hasRealGeminiConfigured } from '../../services/aiService';
 
 export default function AppNavbar({ searchTerm, onSearchChange, title }) {
   const { currentUser, userRole, logout } = useAuth();
@@ -11,14 +9,6 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
-  // Settings / Cloud connection modal
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [fbApiKey, setFbApiKey] = useState(getStoredFirebaseConfig().apiKey || '');
-  const [fbProjectId, setFbProjectId] = useState(getStoredFirebaseConfig().projectId || '');
-  const [fbAuthDomain, setFbAuthDomain] = useState(getStoredFirebaseConfig().authDomain || '');
-  const [geminiKey, setGeminiKeyState] = useState(getGeminiApiKey() || '');
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   const refreshNotifs = () => {
     if (!currentUser) return;
@@ -56,28 +46,10 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
     }
   };
 
-  const handleSaveSettings = (e) => {
-    e.preventDefault();
-    saveStoredFirebaseConfig({
-      apiKey: fbApiKey.trim(),
-      projectId: fbProjectId.trim(),
-      authDomain: fbAuthDomain.trim() || `${fbProjectId.trim()}.firebaseapp.com`
-    });
-    setGeminiApiKey(geminiKey.trim());
-    setSettingsSaved(true);
-    setTimeout(() => {
-      setSettingsSaved(false);
-      setShowSettingsModal(false);
-    }, 1200);
-  };
-
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  const isCloudActive = isCloudFirebaseActive();
-  const hasGemini = hasRealGeminiConfigured();
 
   return (
     <header className="dashboard-topbar">
@@ -107,30 +79,6 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
 
       {/* Right Actions */}
       <div className="topbar-actions">
-        {/* Cloud & AI Sync Pill */}
-        <button
-          type="button"
-          onClick={() => setShowSettingsModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.74rem',
-            padding: '5px 10px',
-            borderRadius: '9999px',
-            border: '1px solid',
-            borderColor: isCloudActive ? '#86efac' : '#cbd5e1',
-            backgroundColor: isCloudActive ? '#f0fdf4' : '#f8fafc',
-            color: isCloudActive ? '#15803d' : '#64748b',
-            cursor: 'pointer',
-            fontWeight: 700
-          }}
-          title="Cloud Database & AI Vision Status"
-        >
-          <span style={{ fontSize: '0.75rem' }}>{isCloudActive ? '🟢' : '💾'}</span>
-          <span>{isCloudActive ? 'Cloud Firestore Sync' : 'Local Storage Mode'}</span>
-        </button>
-
         {/* Notifications Button & Dropdown */}
         <div style={{ position: 'relative' }}>
           <button 
@@ -153,7 +101,7 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
               boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
               border: '1px solid var(--color-border)',
               padding: '16px',
-              zIndex: 200
+              zIndex: 1000
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
                 <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>Notifications ({unreadCount} unread)</strong>
@@ -230,109 +178,6 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
           </button>
         </div>
       </div>
-
-      {/* Cloud & AI Configuration Modal */}
-      {showSettingsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(3px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 500,
-          padding: '20px'
-        }}>
-          <div className="card" style={{ maxWidth: '500px', width: '100%', padding: '28px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
-                  ☁️ Multi-Device Cloud & AI Settings
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
-                  Connect Cloud Firestore for real multi-device sync and Google Gemini Vision for live AI inspection.
-                </p>
-              </div>
-              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#94a3b8', cursor: 'pointer' }}>
-                ✕
-              </button>
-            </div>
-
-            {settingsSaved && (
-              <div style={{ background: '#dcfce7', color: '#15803d', padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '16px', fontWeight: 600 }}>
-                ✓ Settings saved! Reloading to apply cloud connections...
-              </div>
-            )}
-
-            <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>Firebase Cloud Firestore (Multi-Device Sync)</span>
-                <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '4px 0 10px 0' }}>
-                  Enables real-time chat, live food listings, and notifications across different computers and mobile phones.
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>Firebase API Key</label>
-                    <input
-                      type="text"
-                      value={fbApiKey}
-                      onChange={(e) => setFbApiKey(e.target.value)}
-                      placeholder="AIzaSy..."
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>Firebase Project ID</label>
-                    <input
-                      type="text"
-                      value={fbProjectId}
-                      onChange={(e) => setFbProjectId(e.target.value)}
-                      placeholder="foodconnect-production"
-                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>Google Gemini Vision API (Multimodal AI)</span>
-                <p style={{ fontSize: '0.74rem', color: '#64748b', margin: '4px 0 10px 0' }}>
-                  Free from Google AI Studio (aistudio.google.com). If empty, real HTML5 Canvas computer vision is used.
-                </p>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px' }}>Gemini API Key</label>
-                  <input
-                    type="password"
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKeyState(e.target.value)}
-                    placeholder="AIzaSy..."
-                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsModal(false)}
-                  className="btn btn-secondary btn-sm"
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm"
-                >
-                  Save & Apply Config
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

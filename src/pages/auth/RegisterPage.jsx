@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { MAJOR_CITIES_COORDINATES } from '../../services/dataService';
+import { ALL_INDIAN_CITIES, getCityCoordinates } from '../../services/dataService';
+import MapLocationPicker from '../../components/common/MapLocationPicker';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -14,49 +15,32 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedCityKey, setSelectedCityKey] = useState('jaipur');
+  const [cityName, setCityName] = useState('Jaipur');
   const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState(MAJOR_CITIES_COORDINATES.jaipur.lat);
-  const [longitude, setLongitude] = useState(MAJOR_CITIES_COORDINATES.jaipur.lng);
+  const [latitude, setLatitude] = useState(26.9124);
+  const [longitude, setLongitude] = useState(75.7873);
   const [gpsStatus, setGpsStatus] = useState('');
-  const [gpsLoading, setGpsLoading] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleCityChange = (cityKey) => {
-    setSelectedCityKey(cityKey);
-    const cityData = MAJOR_CITIES_COORDINATES[cityKey];
-    if (cityData) {
-      setLatitude(cityData.lat);
-      setLongitude(cityData.lng);
-      setGpsStatus(`📍 Center coordinates selected for ${cityData.name}`);
+  const handleCityChange = (newCityName) => {
+    setCityName(newCityName);
+    const coords = getCityCoordinates(newCityName);
+    if (coords) {
+      setLatitude(coords.lat);
+      setLongitude(coords.lng);
+      setGpsStatus(`📍 Center coordinates selected for ${coords.name}`);
     }
   };
 
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
+  const handleMapLocationSelect = ({ lat, lng, address: suggestedAddr }) => {
+    setLatitude(lat);
+    setLongitude(lng);
+    if (suggestedAddr && (!address || address.trim().length === 0)) {
+      setAddress(suggestedAddr);
     }
-    setGpsLoading(true);
-    setGpsStatus('Detecting live satellite/GPS coordinates...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(5));
-        const lng = Number(pos.coords.longitude.toFixed(5));
-        setLatitude(lat);
-        setLongitude(lng);
-        setGpsLoading(false);
-        setGpsStatus(`✓ Exact GPS Captured: ${lat}, ${lng}`);
-      },
-      (err) => {
-        console.warn('Geolocation error:', err);
-        setGpsLoading(false);
-        setGpsStatus(`⚠️ Could not detect GPS (${err.message}). Using ${MAJOR_CITIES_COORDINATES[selectedCityKey]?.name || 'City'} coordinates.`);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    setGpsStatus(`✓ Pinned on Map: Lat ${lat}, Lng ${lng}`);
   };
 
   const handleSubmit = async (e) => {
@@ -70,7 +54,7 @@ export default function RegisterPage() {
 
     try {
       setSubmitting(true);
-      const chosenCity = MAJOR_CITIES_COORDINATES[selectedCityKey]?.name || 'Jaipur';
+      const chosenCity = cityName.trim() || 'Jaipur';
       const user = await register({
         name: name || organizationName,
         organizationName,
@@ -93,7 +77,7 @@ export default function RegisterPage() {
 
   return (
     <div style={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', background: '#f8fafc' }}>
-      <div className="card" style={{ maxWidth: '520px', width: '100%', padding: '36px 30px' }}>
+      <div className="card" style={{ maxWidth: '640px', width: '100%', padding: '36px 30px' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '1.7rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
@@ -151,7 +135,7 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-              {role === 'donor' ? 'Hotel / Restaurant / Business Name' : 'NGO / Shelter / Foundation Name'}
+              {role === 'donor' ? 'Hotel / Restaurant / Business Name' : 'NGO / Shelter / Foundation Name'} *
             </label>
             <input
               type="text"
@@ -192,7 +176,7 @@ export default function RegisterPage() {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-              Official Email Address
+              Official Email Address *
             </label>
             <input
               type="email"
@@ -204,41 +188,60 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-                Operational City *
+          {/* City Selection with 150+ Indian Cities & Autocomplete */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', margin: 0 }}>
+                Operational City (All India Supported) *
               </label>
-              <select
-                value={selectedCityKey}
-                onChange={(e) => handleCityChange(e.target.value)}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', outline: 'none', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
-              >
-                {Object.entries(MAJOR_CITIES_COORDINATES).map(([key, city]) => (
-                  <option key={key} value={key}>{city.name} ({city.state})</option>
-                ))}
-              </select>
+              <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                150+ Cities & Districts
+              </span>
             </div>
+            <input
+              type="text"
+              required
+              list="all-indian-cities-list"
+              value={cityName}
+              onChange={(e) => handleCityChange(e.target.value)}
+              placeholder="Type or select your city (e.g. Jaipur, Pune, Indore...)"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', outline: 'none', fontSize: '0.9rem' }}
+            />
+            <datalist id="all-indian-cities-list">
+              {ALL_INDIAN_CITIES.map((c, idx) => (
+                <option key={`${c.name}-${idx}`} value={c.name}>
+                  {c.name}, {c.state}
+                </option>
+              ))}
+            </datalist>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-                GPS Pinning
-              </label>
-              <button
-                type="button"
-                onClick={handleDetectGPS}
-                disabled={gpsLoading}
-                className="btn btn-secondary"
-                style={{ width: '100%', padding: '10px 12px', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
-                {gpsLoading ? 'Detecting...' : '📍 Detect Live GPS'}
-              </button>
+            {/* Quick city badges */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+              {['Jaipur', 'Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Pune', 'Ahmedabad', 'Kolkata', 'Lucknow'].map((quickCity) => (
+                <button
+                  key={quickCity}
+                  type="button"
+                  onClick={() => handleCityChange(quickCity)}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    background: cityName.toLowerCase() === quickCity.toLowerCase() ? 'var(--color-primary-dark)' : '#f8fafc',
+                    color: cityName.toLowerCase() === quickCity.toLowerCase() ? '#ffffff' : '#475569',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  {quickCity}
+                </button>
+              ))}
             </div>
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-              Street Address & Landmark *
+              Street Address & Facility Landmark *
             </label>
             <input
               type="text"
@@ -248,16 +251,25 @@ export default function RegisterPage() {
               placeholder={role === 'donor' ? 'e.g. Tonk Road, Service Gate 2' : 'e.g. Sector 4, Community Kitchen Shelter'}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', outline: 'none', fontSize: '0.9rem' }}
             />
-            {gpsStatus && (
-              <p style={{ fontSize: '0.75rem', color: gpsStatus.startsWith('✓') ? '#15803d' : '#b45309', marginTop: '4px', fontWeight: 600 }}>
-                {gpsStatus}
-              </p>
-            )}
+          </div>
+
+          {/* Dynamic Interactive Leaflet Map Location Picker */}
+          <div style={{ marginTop: '2px' }}>
+            <MapLocationPicker
+              initialLat={latitude}
+              initialLng={longitude}
+              initialAddress={address}
+              label={role === 'donor' ? '🏨 Donor Headquarters' : '🤝 NGO Headquarters'}
+              color={role === 'donor' ? '#0b462f' : '#1e40af'}
+              symbol={role === 'donor' ? '🏨' : '🤝'}
+              height="260px"
+              onLocationSelect={handleMapLocationSelect}
+            />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-              Password
+              Password *
             </label>
             <input
               type="password"

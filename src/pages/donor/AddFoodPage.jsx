@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
+import MapLocationPicker from '../../components/common/MapLocationPicker';
 import { useAuth } from '../../context/AuthContext';
 import { foodService } from '../../services/dataService';
 import { analyzeFoodImage } from '../../services/aiService';
@@ -32,26 +33,13 @@ export default function AddFoodPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const handleDetectPickupGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
+  const handleMapLocationSelect = ({ lat, lng, address: suggestedAddr }) => {
+    setPickupLat(lat);
+    setPickupLng(lng);
+    if (suggestedAddr && (!pickupAddress || pickupAddress.trim().length === 0)) {
+      setPickupAddress(suggestedAddr);
     }
-    setGpsPinStatus('Acquiring live kitchen gate coordinates...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(5));
-        const lng = Number(pos.coords.longitude.toFixed(5));
-        setPickupLat(lat);
-        setPickupLng(lng);
-        setGpsPinStatus(`✓ Exact GPS Pinned: ${lat}, ${lng}`);
-      },
-      (err) => {
-        console.warn('Geolocation error:', err);
-        setGpsPinStatus(`⚠️ Geolocation error: ${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    setGpsPinStatus(`✓ Exact Location Pinned: Lat ${lat}, Lng ${lng}`);
   };
 
   // Run AI Analysis whenever image or category changes
@@ -287,16 +275,11 @@ export default function AddFoodPage() {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
-                    Pickup Address & Gate Landmark *
+                    Pickup Address & Loading Gate Landmark *
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleDetectPickupGPS}
-                    className="btn btn-secondary btn-sm"
-                    style={{ fontSize: '0.75rem', padding: '3px 8px' }}
-                  >
-                    📍 Pin My Current GPS
-                  </button>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Interactive Map Pinning
+                  </span>
                 </div>
                 <input
                   type="text"
@@ -304,16 +287,20 @@ export default function AddFoodPage() {
                   value={pickupAddress}
                   onChange={(e) => setPickupAddress(e.target.value)}
                   placeholder="e.g. Hotel Service Gate, Loading Bay 1"
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem', marginBottom: '8px' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '0.72rem', color: '#64748b' }}>
-                  <span>GPS Coordinates: {pickupLat}, {pickupLng}</span>
-                  {gpsPinStatus && (
-                    <span style={{ color: gpsPinStatus.startsWith('✓') ? '#15803d' : '#b45309', fontWeight: 600 }}>
-                      {gpsPinStatus}
-                    </span>
-                  )}
-                </div>
+                
+                {/* Visual Map Pinning for kitchen loading bay */}
+                <MapLocationPicker
+                  initialLat={pickupLat}
+                  initialLng={pickupLng}
+                  initialAddress={pickupAddress}
+                  label="🏨 Kitchen Loading Gate"
+                  color="#0b462f"
+                  symbol="🏨"
+                  height="220px"
+                  onLocationSelect={handleMapLocationSelect}
+                />
               </div>
 
               {/* Free vs Paid Low-Cost Listing (Section 18 & User Requirement 4) */}

@@ -1,22 +1,143 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { calculateDistanceKm } from '../../services/dataService';
+
+// Custom SVG Pin Icon for route maps
+const createMapPin = (symbol, label, color) => {
+  return L.divIcon({
+    className: 'fc-route-pin',
+    html: `
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transform: translate(-50%, -100%);
+      ">
+        <div style="
+          background: ${color};
+          color: #ffffff;
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-weight: 800;
+          font-size: 11px;
+          white-space: nowrap;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+          border: 2px solid #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-family: inherit;
+        ">
+          <span style="font-size: 13px;">${symbol}</span>
+          <span>${label}</span>
+        </div>
+        <div style="
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 8px solid ${color};
+        "></div>
+      </div>
+    `,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0]
+  });
+};
 
 export default function FoodConnectMap({
   donorLocation = { lat: 26.8520, lng: 75.8050, label: 'Hotel Green Valley', address: 'Tonk Road' },
   ngoLocation = { lat: 26.8920, lng: 75.8250, label: 'Hope Foundation', address: 'Distribution Center' },
   pickupLocation = null,
-  height = '320px',
+  height = '340px',
   showRoute = true
 }) {
-  const distanceKm = calculateDistanceKm(
-    donorLocation.lat,
-    donorLocation.lng,
-    ngoLocation.lat,
-    ngoLocation.lng
-  );
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
 
+  const donorLat = donorLocation?.lat || 26.8520;
+  const donorLng = donorLocation?.lng || 75.8050;
+  const ngoLat = ngoLocation?.lat || 26.8920;
+  const ngoLng = ngoLocation?.lng || 75.8250;
+
+  const distanceKm = calculateDistanceKm(donorLat, donorLng, ngoLat, ngoLng);
   const estMinutes = Math.max(5, Math.round(distanceKm * 2.5));
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${donorLocation.lat},${donorLocation.lng}&destination=${ngoLocation.lat},${ngoLocation.lng}`;
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${donorLat},${donorLng}&destination=${ngoLat},${ngoLng}`;
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+    }
+
+    const bounds = L.latLngBounds([
+      [donorLat, donorLng],
+      [ngoLat, ngoLng]
+    ]);
+
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: false
+    });
+
+    // Street tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Donor Marker (Hotel / Food Source)
+    const donorMarker = L.marker([donorLat, donorLng], {
+      icon: createMapPin('🏨', donorLocation.label || 'Food Donor Pickup', '#0b462f')
+    }).addTo(map);
+
+    donorMarker.bindPopup(`
+      <div style="font-family: inherit; font-size: 12px;">
+        <strong>🏨 ${donorLocation.label || 'Food Donor'}</strong>
+        <p style="margin: 4px 0 0 0; color: #475569;">${donorLocation.address || 'Pickup Point'}</p>
+      </div>
+    `);
+
+    // NGO Marker (Recipient / Food Bank)
+    const ngoMarker = L.marker([ngoLat, ngoLng], {
+      icon: createMapPin('🤝', ngoLocation.label || 'Recipient NGO', '#15803d')
+    }).addTo(map);
+
+    ngoMarker.bindPopup(`
+      <div style="font-family: inherit; font-size: 12px;">
+        <strong>🤝 ${ngoLocation.label || 'Recipient NGO'}</strong>
+        <p style="margin: 4px 0 0 0; color: #475569;">${ngoLocation.address || 'Distribution Center'}</p>
+      </div>
+    `);
+
+    // Route Polyline (Green dashed line connecting donor and NGO)
+    if (showRoute) {
+      const routeLine = L.polyline(
+        [
+          [donorLat, donorLng],
+          [ngoLat, ngoLng]
+        ],
+        {
+          color: '#10b981',
+          weight: 5,
+          opacity: 0.85,
+          dashArray: '8, 8'
+        }
+      ).addTo(map);
+    }
+
+    // Fit bounds with comfortable padding so both markers and labels are visible
+    map.fitBounds(bounds, { padding: [60, 60] });
+
+    mapInstanceRef.current = map;
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, [donorLat, donorLng, ngoLat, ngoLng]);
 
   return (
     <div style={{
@@ -25,58 +146,11 @@ export default function FoodConnectMap({
       borderRadius: '16px',
       overflow: 'hidden',
       position: 'relative',
-      backgroundColor: '#e5e7eb',
       border: '1px solid var(--color-border)',
       boxShadow: 'var(--shadow-sm)'
     }}>
-      {/* Visual Vector Map Canvas */}
-      <svg width="100%" height="100%" viewBox="0 0 800 400" preserveAspectRatio="none" style={{ display: 'block', background: '#f1f5f9' }}>
-        {/* Background Grid & Roads Pattern */}
-        <defs>
-          <pattern id="roadGrid" width="80" height="80" patternUnits="userSpaceOnUse">
-            <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#e2e8f0" strokeWidth="2" />
-          </pattern>
-        </defs>
-        <rect width="800" height="400" fill="url(#roadGrid)" />
-
-        {/* Decorative City River / Green Parks */}
-        <path d="M 0 320 Q 250 280 450 350 T 800 300 L 800 400 L 0 400 Z" fill="#dcfce7" opacity="0.6" />
-        <path d="M 120 40 Q 280 120 500 60 T 800 100" fill="none" stroke="#cbd5e1" strokeWidth="12" />
-        <path d="M 400 0 Q 380 200 420 400" fill="none" stroke="#cbd5e1" strokeWidth="16" />
-
-        {/* Dynamic Route Line */}
-        {showRoute && (
-          <path
-            d="M 240 220 C 320 200, 480 260, 560 140"
-            fill="none"
-            stroke="#10b981"
-            strokeWidth="5"
-            strokeDasharray="8 6"
-          />
-        )}
-
-        {/* Donor Marker */}
-        <g transform="translate(240, 220)">
-          <circle r="22" fill="#0b462f" />
-          <circle r="30" fill="#0b462f" opacity="0.2" />
-          <text textAnchor="middle" dy="6" fill="#ffffff" fontSize="14" fontWeight="bold">🏨</text>
-          <rect x="-60" y="26" width="120" height="24" rx="6" fill="#0b462f" />
-          <text textAnchor="middle" x="0" y="42" fill="#ffffff" fontSize="10" fontWeight="bold">
-            {donorLocation.label || 'Donor Pickup'}
-          </text>
-        </g>
-
-        {/* NGO Marker */}
-        <g transform="translate(560, 140)">
-          <circle r="22" fill="#15803d" />
-          <circle r="30" fill="#15803d" opacity="0.2" />
-          <text textAnchor="middle" dy="6" fill="#ffffff" fontSize="14" fontWeight="bold">🤝</text>
-          <rect x="-60" y="26" width="120" height="24" rx="6" fill="#15803d" />
-          <text textAnchor="middle" x="0" y="42" fill="#ffffff" fontSize="10" fontWeight="bold">
-            {ngoLocation.label || 'NGO Headquarters'}
-          </text>
-        </g>
-      </svg>
+      {/* Real Interactive Leaflet Map */}
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Floating Info Overlay Badge */}
       <div style={{
@@ -87,11 +161,12 @@ export default function FoodConnectMap({
         backdropFilter: 'blur(8px)',
         padding: '8px 14px',
         borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        border: '1px solid var(--color-border)'
+        border: '1px solid var(--color-border)',
+        zIndex: 500
       }}>
         <span style={{ fontSize: '1.2rem' }}>📍</span>
         <div>
@@ -104,7 +179,7 @@ export default function FoodConnectMap({
         </div>
       </div>
 
-      {/* External Map Action */}
+      {/* Direct Google Maps Directions Navigation Button */}
       <a
         href={googleMapsUrl}
         target="_blank"
@@ -120,10 +195,11 @@ export default function FoodConnectMap({
           fontSize: '0.78rem',
           fontWeight: 700,
           textDecoration: 'none',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px'
+          gap: '6px',
+          zIndex: 500
         }}
       >
         <span>🗺️</span> Open in Google Maps

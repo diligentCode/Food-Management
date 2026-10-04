@@ -1,22 +1,6 @@
-import React, { useState } from 'react';
-import { getGeminiApiKey, setGeminiApiKey, hasRealGeminiConfigured } from '../../services/aiService';
+import React from 'react';
 
-export default function AIQualityCard({ score = 88, status = 'Good Quality', analysis = null, loading = false, onApiKeyUpdated = null }) {
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [inputKey, setInputKey] = useState(getGeminiApiKey() || '');
-  const [keySaved, setKeySaved] = useState(false);
-
-  const handleSaveKey = (e) => {
-    e.preventDefault();
-    setGeminiApiKey(inputKey);
-    setKeySaved(true);
-    setTimeout(() => {
-      setKeySaved(false);
-      setShowKeyModal(false);
-      if (onApiKeyUpdated) onApiKeyUpdated();
-    }, 1200);
-  };
-
+export default function AIQualityCard({ score = 88, status = 'Good Quality', analysis = null, loading = false }) {
   if (loading) {
     return (
       <div style={{
@@ -27,7 +11,7 @@ export default function AIQualityCard({ score = 88, status = 'Good Quality', ana
         textAlign: 'center'
       }}>
         <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🤖✨</div>
-        <p style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0b462f' }}>
+        <p style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0b462f', margin: '0 0 4px 0' }}>
           AI Inspecting Food Visual Freshness...
         </p>
         <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
@@ -44,7 +28,6 @@ export default function AIQualityCard({ score = 88, status = 'Good Quality', ana
   };
 
   const badge = getBadgeColor(score);
-  const hasGemini = hasRealGeminiConfigured();
 
   return (
     <div style={{
@@ -67,29 +50,14 @@ export default function AIQualityCard({ score = 88, status = 'Good Quality', ana
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
             <span style={{
               fontSize: '0.7rem',
-              backgroundColor: analysis?.isRealAi ? '#e0e7ff' : '#ecfdf5',
-              color: analysis?.isRealAi ? '#3730a3' : '#047857',
+              backgroundColor: '#ecfdf5',
+              color: '#047857',
               fontWeight: 700,
               padding: '2px 8px',
               borderRadius: '4px'
             }}>
-              {analysis?.engine || (analysis?.isRealAi ? 'Google Gemini 1.5 Flash' : 'Pixel Computer Vision')}
+              {analysis?.engine || 'Automated Visual Quality & Freshness Engine'}
             </span>
-            <button
-              type="button"
-              onClick={() => setShowKeyModal(true)}
-              style={{
-                fontSize: '0.68rem',
-                color: '#2563eb',
-                textDecoration: 'underline',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0
-              }}
-            >
-              {hasGemini ? '⚙️ Gemini Key Active' : '🔑 Set Free Gemini API Key'}
-            </button>
           </div>
         </div>
 
@@ -157,67 +125,6 @@ export default function AIQualityCard({ score = 88, status = 'Good Quality', ana
       <p style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', margin: 0, borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
         ⚠️ <strong>Safety Notice:</strong> AI freshness scoring is a visual assessment aid and does not substitute mandatory physical sensory inspection prior to community distribution.
       </p>
-
-      {/* Modal for setting Gemini API Key */}
-      {showKeyModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(3px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 400,
-          padding: '20px'
-        }}>
-          <div className="card" style={{ maxWidth: '460px', width: '100%', padding: '24px' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '8px' }}>
-              🤖 Google Gemini Vision API Configuration
-            </h3>
-            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '16px', lineHeight: 1.4 }}>
-              Enter your Google Gemini API key to enable live AI vision inspection. You can get a 100% free API key from Google AI Studio (aistudio.google.com).
-            </p>
-
-            {keySaved && (
-              <div style={{ background: '#dcfce7', color: '#15803d', padding: '10px', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '14px', fontWeight: 600 }}>
-                ✓ Gemini API Key saved successfully!
-              </div>
-            )}
-
-            <form onSubmit={handleSaveKey}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px' }}>
-                  Gemini API Key
-                </label>
-                <input
-                  type="password"
-                  value={inputKey}
-                  onChange={(e) => setInputKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowKeyModal(false)}
-                  className="btn btn-secondary btn-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm"
-                >
-                  Save API Key
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

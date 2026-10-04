@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { MAJOR_CITIES_COORDINATES } from '../../services/dataService';
+import { ALL_INDIAN_CITIES, getCityCoordinates } from '../../services/dataService';
+import MapLocationPicker from '../../components/common/MapLocationPicker';
 
 export default function ProfilePage() {
   const { currentUser, userRole, updateProfile } = useAuth();
@@ -15,43 +16,25 @@ export default function ProfilePage() {
   const [lat, setLat] = useState(currentUser?.location?.lat || 26.9124);
   const [lng, setLng] = useState(currentUser?.location?.lng || 75.7873);
   const [gpsStatus, setGpsStatus] = useState('');
-  const [gpsLoading, setGpsLoading] = useState(false);
   const [savedMessage, setSavedMessage] = useState(false);
 
   const handleCitySelect = (cityName) => {
     setCity(cityName);
-    // Find matching city coordinates
-    const match = Object.values(MAJOR_CITIES_COORDINATES).find(c => c.name.toLowerCase() === cityName.toLowerCase());
-    if (match) {
-      setLat(match.lat);
-      setLng(match.lng);
-      setGpsStatus(`📍 Center coordinates applied for ${cityName}`);
+    const coords = getCityCoordinates(cityName);
+    if (coords) {
+      setLat(coords.lat);
+      setLng(coords.lng);
+      setGpsStatus(`📍 Center coordinates applied for ${coords.name}`);
     }
   };
 
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
+  const handleMapLocationSelect = ({ lat: newLat, lng: newLng, address: suggestedAddr }) => {
+    setLat(newLat);
+    setLng(newLng);
+    if (suggestedAddr && (!address || address.trim().length === 0)) {
+      setAddress(suggestedAddr);
     }
-    setGpsLoading(true);
-    setGpsStatus('Acquiring live satellite GPS coordinates...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const newLat = Number(pos.coords.latitude.toFixed(5));
-        const newLng = Number(pos.coords.longitude.toFixed(5));
-        setLat(newLat);
-        setLng(newLng);
-        setGpsLoading(false);
-        setGpsStatus(`✓ Live GPS Updated: Lat ${newLat}, Lng ${newLng}`);
-      },
-      (err) => {
-        console.warn('GPS error:', err);
-        setGpsLoading(false);
-        setGpsStatus(`⚠️ Geolocation error: ${err.message}`);
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    setGpsStatus(`✓ Pinned on Map: Lat ${newLat}, Lng ${newLng}`);
   };
 
   const handleSubmit = (e) => {
@@ -164,41 +147,59 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                    Operational City
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
+                    Operational City (All India Supported) *
                   </label>
-                  <select
-                    value={city}
-                    onChange={(e) => handleCitySelect(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', backgroundColor: '#ffffff' }}
-                  >
-                    {Object.values(MAJOR_CITIES_COORDINATES).map((c) => (
-                      <option key={c.name} value={c.name}>{c.name} ({c.state})</option>
-                    ))}
-                  </select>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    150+ Indian Cities & Municipalities
+                  </span>
                 </div>
+                <input
+                  type="text"
+                  required
+                  list="profile-indian-cities-list"
+                  value={city}
+                  onChange={(e) => handleCitySelect(e.target.value)}
+                  placeholder="Type or select city (e.g. Jaipur, Bengaluru, Lucknow...)"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                />
+                <datalist id="profile-indian-cities-list">
+                  {ALL_INDIAN_CITIES.map((c, idx) => (
+                    <option key={`prof-${c.name}-${idx}`} value={c.name}>
+                      {c.name}, {c.state}
+                    </option>
+                  ))}
+                </datalist>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                    Live GPS Recalibration
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleDetectGPS}
-                    disabled={gpsLoading}
-                    className="btn btn-secondary"
-                    style={{ width: '100%', padding: '10px 14px', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                  >
-                    {gpsLoading ? 'Detecting GPS...' : '📍 Calibrate My Live GPS'}
-                  </button>
+                {/* Popular city badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                  {['Jaipur', 'Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Pune', 'Ahmedabad', 'Kolkata', 'Lucknow'].map((quickCity) => (
+                    <button
+                      key={quickCity}
+                      type="button"
+                      onClick={() => handleCitySelect(quickCity)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        borderRadius: '12px',
+                        border: '1px solid #cbd5e1',
+                        background: city.toLowerCase() === quickCity.toLowerCase() ? 'var(--color-primary-dark)' : '#f8fafc',
+                        color: city.toLowerCase() === quickCity.toLowerCase() ? '#ffffff' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      {quickCity}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                  Pickup Address / Headquarters Street Landmark
+                  Pickup Address / Headquarters Street Landmark *
                 </label>
                 <input
                   type="text"
@@ -208,16 +209,23 @@ export default function ProfilePage() {
                   placeholder="e.g. Tonk Road, Service Bay Gate 2"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                    Active Coordinates: <strong>{lat}, {lng}</strong>
-                  </span>
-                  {gpsStatus && (
-                    <span style={{ fontSize: '0.75rem', color: gpsStatus.startsWith('✓') ? '#15803d' : '#b45309', fontWeight: 600 }}>
-                      {gpsStatus}
-                    </span>
-                  )}
-                </div>
+              </div>
+
+              {/* Dynamic Interactive Leaflet Map Location Picker */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
+                  Pin Headquarters / Loading Dock Location on Map
+                </label>
+                <MapLocationPicker
+                  initialLat={lat}
+                  initialLng={lng}
+                  initialAddress={address}
+                  label={userRole === 'donor' ? '🏨 Donor Headquarters' : '🤝 NGO Operations Base'}
+                  color={userRole === 'donor' ? '#0b462f' : '#1e40af'}
+                  symbol={userRole === 'donor' ? '🏨' : '🤝'}
+                  height="280px"
+                  onLocationSelect={handleMapLocationSelect}
+                />
               </div>
 
               <button type="submit" className="btn btn-primary" style={{ marginTop: '10px', alignSelf: 'flex-start' }}>
