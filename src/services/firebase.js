@@ -33,14 +33,14 @@ export function getStoredFirebaseConfig() {
     console.warn('Could not parse stored Firebase config:', e);
   }
 
-  // Fallback to environment variables
+  // Fallback to environment variables or project defaults
   return {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBMb9Zi87hcckZLkHVBWwFguBXwXD7pNvI",
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "food-management-c356c.firebaseapp.com",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "food-management-c356c",
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "food-management-c356c.firebasestorage.app",
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "649926931558",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:649926931558:web:1639242ad3a60fba26a9a7"
   };
 }
 
