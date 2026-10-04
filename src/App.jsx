@@ -1,59 +1,178 @@
 import React from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';
-import LandingPage from './pages/LandingPage';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
-// Simple placeholder page for auth routes during Phase 0
-function AuthPlaceholder({ title, description }) {
-  return (
-    <div className="container" style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '60px 20px' }}>
-      <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '40px 32px' }}>
-        <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--color-primary-light)', color: 'var(--color-primary-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', margin: '0 auto 20px auto' }}>
-          🌱
-        </div>
-        <h2 style={{ fontSize: '1.6rem', color: 'var(--color-primary-dark)', marginBottom: '8px' }}>{title}</h2>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginBottom: '24px', lineHeight: '1.5' }}>
-          {description}
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Link to="/" className="btn btn-primary">
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Public Pages
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+
+// Donor Pages
+import DonorDashboard from './pages/donor/DonorDashboard';
+import AddFoodPage from './pages/donor/AddFoodPage';
+import MyListingsPage from './pages/donor/MyListingsPage';
+import DonorTrackingPage from './pages/donor/DonorTrackingPage';
+
+// NGO Pages
+import NGODashboard from './pages/ngo/NGODashboard';
+import NGOAvailableFoodPage from './pages/ngo/NGOAvailableFoodPage';
+import NGODistributionsPage from './pages/ngo/NGODistributionsPage';
+import NGOMapPage from './pages/ngo/NGOMapPage';
+
+// Shared Pages
+import ChatPage from './pages/shared/ChatPage';
+import ProfilePage from './pages/shared/ProfilePage';
+
+// Admin Page
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 export default function App() {
   return (
-    <div className="app-container" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <main style={{ flex: 1 }}>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route 
-            path="/login" 
-            element={
-              <AuthPlaceholder 
-                title="FoodConnect Login" 
-                description="Authentication module is configured next in Phase 2. You will be able to log in as a Donor or NGO."
-              />
-            } 
-          />
-          <Route 
-            path="/register" 
-            element={
-              <AuthPlaceholder 
-                title="Create an Account" 
-                description="Registration module is configured in Phase 2 with full Donor and NGO role selection."
-              />
-            } 
-          />
-        </Routes>
-      </main>
-      <Footer />
-    </div>
+    <AuthProvider>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* DONOR PROTECTED ROUTES */}
+        <Route
+          path="/donor"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <DonorDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/add-food"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <AddFoodPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/listings"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <MyListingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/tracking"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <DonorTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/messages"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/profile"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* NGO PROTECTED ROUTES */}
+        <Route
+          path="/ngo"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <NGODashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ngo/available"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <NGOAvailableFoodPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ngo/requests"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <NGODistributionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ngo/map"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <NGOMapPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ngo/messages"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ngo/profile"
+          element={
+            <ProtectedRoute allowedRoles={['ngo']}>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ADMIN ROUTES */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/listings"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/donations"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch-all Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }
