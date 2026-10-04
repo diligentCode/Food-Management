@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
-  const { login, loginAsDonor, loginAsNGO, loginAsAdmin } = useAuth();
+  const { login, quickTestLogin } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -34,16 +34,10 @@ export default function LoginPage() {
   };
 
   const handleQuickLogin = (role) => {
-    if (role === 'donor') {
-      loginAsDonor();
-      navigate('/donor');
-    } else if (role === 'ngo') {
-      loginAsNGO();
-      navigate('/ngo');
-    } else if (role === 'admin') {
-      loginAsAdmin();
-      navigate('/admin');
-    }
+    const user = quickTestLogin(role);
+    if (user.role === 'donor') navigate('/donor');
+    else if (user.role === 'ngo') navigate('/ngo');
+    else if (user.role === 'admin') navigate('/admin');
   };
 
   return (

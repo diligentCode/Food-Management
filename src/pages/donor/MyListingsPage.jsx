@@ -67,8 +67,8 @@ export default function MyListingsPage() {
           </div>
 
           {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
-            {['all', 'available', 'accepted', 'pickup_started', 'delivered'].map((st) => (
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
+            {['all', 'available', 'accepted', 'pickup_started', 'delivered', 'expired'].map((st) => (
               <button
                 key={st}
                 onClick={() => setFilter(st)}
@@ -141,16 +141,27 @@ export default function MyListingsPage() {
                   </div>
 
                   <div className="listing-actions-col">
-                    <span className="badge badge-success">
-                      ● {item.status.toUpperCase()}
+                    <span className={`badge ${item.status === 'expired' ? 'badge-warning' : item.status === 'waste_collection_requested' ? 'badge-green' : 'badge-success'}`}>
+                      ● {item.status.replace('_', ' ').toUpperCase()}
                     </span>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                      <button
-                        onClick={() => setEditingItem(item)}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        ✏️ Edit
-                      </button>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                      {item.status === 'expired' && (
+                        <Link
+                          to="/donor/waste-management"
+                          className="btn btn-primary btn-sm"
+                          style={{ backgroundColor: '#047857', fontSize: '0.78rem' }}
+                        >
+                          ♻️ Municipal Waste Pickup
+                        </Link>
+                      )}
+                      {item.status === 'available' && (
+                        <button
+                          onClick={() => setEditingItem(item)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          ✏️ Edit
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(item.id)}
                         className="btn btn-secondary btn-sm"

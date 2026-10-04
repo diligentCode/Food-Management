@@ -1,291 +1,21 @@
 // ===================================================================
-// FOODCONNECT - DATA SERVICE LAYER
-// Handles all data operations for:
-// - Users
-// - Food Listings
-// - Donations & Status Tracking
-// - Messages
-// - Notifications
-// Uses LocalStorage persistence with seeded initial data from reference images.
+// FOODCONNECT - DATA SERVICE LAYER (CLEAN SLATE & PRODUCTION ARCHITECTURE)
+// Handles all data operations with ZERO pre-populated sample listings/donations.
+// Full schema integrity, expiration logic, and municipal waste management.
 // ===================================================================
 
 const STORAGE_KEYS = {
-  USERS: 'foodconnect_users',
-  LISTINGS: 'foodconnect_listings',
-  DONATIONS: 'foodconnect_donations',
-  MESSAGES: 'foodconnect_messages',
-  NOTIFICATIONS: 'foodconnect_notifications'
+  USERS: 'foodconnect_users_v2',
+  LISTINGS: 'foodconnect_listings_v2',
+  DONATIONS: 'foodconnect_donations_v2',
+  MESSAGES: 'foodconnect_messages_v2',
+  NOTIFICATIONS: 'foodconnect_notifications_v2',
+  WASTE_REQUESTS: 'foodconnect_waste_requests_v2',
+  CLEAN_INITIALIZED: 'foodconnect_blank_slate_v2'
 };
 
-// Seed initial users matching reference images
-const INITIAL_USERS = [
-  {
-    id: 'user_donor_1',
-    name: 'Hotel Green Valley',
-    email: 'hotel.greenvalley@example.com',
-    role: 'donor',
-    organizationName: 'Hotel Green Valley Resort & Dining',
-    address: 'Near Tonk Road, Jaipur, Rajasthan',
-    location: { lat: 26.8520, lng: 75.8050 },
-    profileImage: '/images/FoodBridge Donation Dashboard.png',
-    phone: '+91 98290 12345',
-    isVerified: true,
-    totalDonatedTons: 2.6,
-    ngosReached: 3,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'user_ngo_1',
-    name: 'Hope Foundation',
-    email: 'hope.foundation@ngo.org',
-    role: 'ngo',
-    organizationName: 'Hope Foundation for Hunger Relief',
-    address: 'Adarsh Nagar, Jaipur, Rajasthan',
-    location: { lat: 26.8920, lng: 75.8250 },
-    profileImage: '/images/FoodBridge NGO Donation Dashboard.png',
-    phone: '+91 98765 43210',
-    isVerified: true,
-    mealsDistributed: 125,
-    foodSavedTons: 8.5,
-    peopleFed: 350,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'user_admin_1',
-    name: 'FoodConnect Admin',
-    email: 'admin@foodconnect.org',
-    role: 'admin',
-    organizationName: 'FoodConnect Central Administration',
-    address: 'National HQ, New Delhi',
-    location: { lat: 28.6139, lng: 77.2090 },
-    phone: '+91 11 2345 6789',
-    isVerified: true,
-    createdAt: new Date().toISOString()
-  }
-];
-
-// Seed initial listings matching the user's reference images
-const INITIAL_LISTINGS = [
-  {
-    id: 'food_1',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Green Valley',
-    foodName: 'Veg Biryani',
-    category: 'Rice',
-    description: 'Freshly prepared aromatic basmati vegetable biryani with fresh mint, paneer and spices.',
-    quantity: 25,
-    unit: 'kg',
-    foodType: 'Vegetarian',
-    preparedAt: '11 May, 10:00 AM',
-    pickupDeadline: 'Today, 6:00 PM',
-    expiresInText: 'Expires in 4h 15m',
-    imageURL: '/images/1.jpg',
-    pickupAddress: 'Hotel Green Valley, Tonk Road, Jaipur',
-    latitude: 26.8520,
-    longitude: 75.8050,
-    listingType: 'free',
-    price: 0,
-    qualityScore: 88,
-    qualityStatus: 'Good Quality',
-    status: 'available', // available | accepted | pickup_started | picked_up | delivered | cancelled
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'food_2',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Royal Palace',
-    foodName: 'Paneer Curry',
-    category: 'Curry',
-    description: 'Rich tomato-cashew gravy with cottage cheese cubes. Packaged in sanitized food containers.',
-    quantity: 15,
-    unit: 'kg',
-    foodType: 'Vegetarian',
-    preparedAt: '11 May, 09:30 AM',
-    pickupDeadline: 'Today, 7:30 PM',
-    expiresInText: 'Expires in 6h 20m',
-    imageURL: '/images/2.jpg',
-    pickupAddress: 'Royal Palace Banquet, C-Scheme, Jaipur',
-    latitude: 26.9050,
-    longitude: 75.8000,
-    listingType: 'free',
-    price: 0,
-    qualityScore: 85,
-    qualityStatus: 'Good Quality',
-    status: 'available',
-    createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'food_3',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Sunrise',
-    foodName: 'Dal Tadka',
-    category: 'Curry',
-    description: 'Traditional yellow lentils tempered with cumin, garlic and clarified butter. Hot and fresh.',
-    quantity: 20,
-    unit: 'kg',
-    foodType: 'Vegetarian',
-    preparedAt: '11 May, 09:00 AM',
-    pickupDeadline: 'Today, 8:00 PM',
-    expiresInText: 'Expires in 7h 10m',
-    imageURL: '/images/4.jpg',
-    pickupAddress: 'Hotel Sunrise, MI Road, Jaipur',
-    latitude: 26.9180,
-    longitude: 75.8150,
-    listingType: 'free',
-    price: 0,
-    qualityScore: 90,
-    qualityStatus: 'Excellent Quality',
-    status: 'available',
-    createdAt: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'food_4',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Modern Stay',
-    foodName: 'Fresh Salad',
-    category: 'Vegetables',
-    description: 'Crisp garden vegetables including cucumber, carrots, cherry tomatoes, and sweet corn.',
-    quantity: 10,
-    unit: 'kg',
-    foodType: 'Vegetarian',
-    preparedAt: '11 May, 11:00 AM',
-    pickupDeadline: 'Today, 9:00 PM',
-    expiresInText: 'Expires in 8h 45m',
-    imageURL: '/images/3.jpg',
-    pickupAddress: 'Hotel Modern Stay, Mansarovar, Jaipur',
-    latitude: 26.8600,
-    longitude: 75.7600,
-    listingType: 'free',
-    price: 0,
-    qualityScore: 92,
-    qualityStatus: 'Excellent Quality',
-    status: 'available',
-    createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'food_5',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Grand Plaza',
-    foodName: 'Gulab Jamun',
-    category: 'Desserts',
-    description: 'Delicious warm sweet dumplings in rose-scented cardamom syrup from lunch banquet.',
-    quantity: 8,
-    unit: 'kg',
-    foodType: 'Vegetarian',
-    preparedAt: '11 May, 10:30 AM',
-    pickupDeadline: 'Today, 10:00 PM',
-    expiresInText: 'Expires in 9h 30m',
-    imageURL: '/images/5.jpg',
-    pickupAddress: 'Hotel Grand Plaza, Malviya Nagar, Jaipur',
-    latitude: 26.8500,
-    longitude: 75.8200,
-    listingType: 'free',
-    price: 0,
-    qualityScore: 94,
-    qualityStatus: 'Excellent Quality',
-    status: 'available',
-    createdAt: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
-
-// Seed initial active donations
-const INITIAL_DONATIONS = [
-  {
-    id: 'donation_1',
-    foodListingId: 'food_sample_accepted',
-    foodName: 'Special Thali Meals',
-    donorId: 'user_donor_1',
-    donorName: 'Hotel Green Valley',
-    ngoId: 'user_ngo_1',
-    ngoName: 'Hope Foundation',
-    quantity: '30 Meals',
-    imageURL: '/images/6.jpg',
-    status: 'accepted', // POSTED -> ACCEPTED -> PICKUP STARTED -> PICKED UP -> DELIVERED
-    pickupAddress: 'Hotel Green Valley, Tonk Road, Jaipur',
-    acceptedAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    pickupStartedAt: null,
-    pickedUpAt: null,
-    deliveredAt: null,
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
-
-// Seed initial messages
-const INITIAL_MESSAGES = [
-  {
-    id: 'msg_1',
-    conversationId: 'conv_donor1_ngo1',
-    senderId: 'user_donor_1',
-    senderName: 'Hotel Green Valley',
-    receiverId: 'user_ngo_1',
-    message: 'Hello Hope Foundation! The Veg Biryani is packed in insulated containers and ready at the back kitchen entrance.',
-    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    read: true
-  },
-  {
-    id: 'msg_2',
-    conversationId: 'conv_donor1_ngo1',
-    senderId: 'user_ngo_1',
-    senderName: 'Hope Foundation',
-    receiverId: 'user_donor_1',
-    message: 'Thank you! Our volunteer van has started towards your location and will arrive in 20 minutes.',
-    createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    read: true
-  },
-  {
-    id: 'msg_3',
-    conversationId: 'conv_donor1_ngo1',
-    senderId: 'user_donor_1',
-    senderName: 'Hotel Green Valley',
-    receiverId: 'user_ngo_1',
-    message: 'Understood. Please call Mr. Ramesh at the kitchen gate when you arrive.',
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    read: false
-  }
-];
-
-// Seed initial notifications
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif_1',
-    userId: 'user_ngo_1',
-    title: 'New Food Available Nearby',
-    message: 'Hotel Green Valley has listed 25 kg Veg Biryani (2.4 km away).',
-    type: 'new_food',
-    relatedId: 'food_1',
-    read: false,
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
-  },
-  {
-    id: 'notif_2',
-    userId: 'user_donor_1',
-    title: 'Listing Accepted!',
-    message: 'Hope Foundation accepted your Special Thali Meals donation.',
-    type: 'donation_accepted',
-    relatedId: 'donation_1',
-    read: false,
-    createdAt: new Date(Date.now() - 1 * 3600 * 1000).toISOString()
-  },
-  {
-    id: 'notif_3',
-    userId: 'user_ngo_1',
-    title: 'Pickup Status Update',
-    message: 'Special Thali Meals is ready for pickup at Tonk Road.',
-    type: 'pickup_status',
-    relatedId: 'donation_1',
-    read: false,
-    createdAt: new Date(Date.now() - 40 * 60 * 1000).toISOString()
-  }
-];
-
-// LocalStorage helpers
-function loadStorage(key, fallback) {
+// Safe storage utilities
+function loadStorage(key, fallback = []) {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) {
@@ -307,10 +37,39 @@ function saveStorage(key, value) {
   }
 }
 
-// Distance Calculation (Haversine formula in kilometers)
+// Ensure clean slate on initial run
+function initializeCleanSlate() {
+  try {
+    const initialized = localStorage.getItem(STORAGE_KEYS.CLEAN_INITIALIZED);
+    if (!initialized) {
+      // Clear legacy storage keys with mock data
+      localStorage.removeItem('foodconnect_listings');
+      localStorage.removeItem('foodconnect_donations');
+      localStorage.removeItem('foodconnect_messages');
+      localStorage.removeItem('foodconnect_notifications');
+      localStorage.removeItem('foodconnect_active_user');
+
+      // Initialize empty arrays
+      saveStorage(STORAGE_KEYS.USERS, []);
+      saveStorage(STORAGE_KEYS.LISTINGS, []);
+      saveStorage(STORAGE_KEYS.DONATIONS, []);
+      saveStorage(STORAGE_KEYS.MESSAGES, []);
+      saveStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+      saveStorage(STORAGE_KEYS.WASTE_REQUESTS, []);
+
+      localStorage.setItem(STORAGE_KEYS.CLEAN_INITIALIZED, 'true');
+    }
+  } catch (e) {
+    console.warn('Could not initialize clean slate:', e);
+  }
+}
+
+initializeCleanSlate();
+
+// Haversine Distance Calculation (in km)
 export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 2.5; // default fallback
-  const R = 6371; // Earth's radius in km
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 2.5;
+  const R = 6371; // Earth radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -320,8 +79,15 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const dist = R * c;
-  return Number(dist.toFixed(1));
+  return Number((R * c).toFixed(1));
+}
+
+// Helper to check if a listing's expiration time has passed
+export function isListingExpired(listing) {
+  if (listing.status === 'expired') return true;
+  if (!listing.expiresAt) return false;
+  const expireDate = new Date(listing.expiresAt);
+  return !isNaN(expireDate.getTime()) && Date.now() > expireDate.getTime();
 }
 
 // -------------------------------------------------------------
@@ -329,7 +95,7 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
 // -------------------------------------------------------------
 export const userService = {
   getUsers() {
-    return loadStorage(STORAGE_KEYS.USERS, INITIAL_USERS);
+    return loadStorage(STORAGE_KEYS.USERS, []);
   },
   getUserById(id) {
     const users = this.getUsers();
@@ -338,10 +104,17 @@ export const userService = {
   createUser(userData) {
     const users = this.getUsers();
     const newUser = {
-      id: 'user_' + Date.now(),
-      isVerified: false,
-      createdAt: new Date().toISOString(),
-      ...userData
+      id: 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      name: userData.name || userData.organizationName,
+      email: userData.email,
+      phone: userData.phone || '',
+      role: userData.role, // 'donor' | 'ngo' | 'admin'
+      organizationName: userData.organizationName || userData.name,
+      address: userData.address || '',
+      location: userData.location || { lat: 26.9124, lng: 75.7873 },
+      profileImage: userData.profileImage || '',
+      isVerified: userData.role === 'donor' || userData.role === 'ngo' ? false : true,
+      createdAt: new Date().toISOString()
     };
     users.push(newUser);
     saveStorage(STORAGE_KEYS.USERS, users);
@@ -374,47 +147,93 @@ export const userService = {
 // -------------------------------------------------------------
 export const foodService = {
   getListings() {
-    return loadStorage(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
+    const listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
+    let modified = false;
+
+    // Check expiration on read
+    listings.forEach(item => {
+      if (item.status === 'available' && isListingExpired(item)) {
+        item.status = 'expired';
+        item.updatedAt = new Date().toISOString();
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      saveStorage(STORAGE_KEYS.LISTINGS, listings);
+    }
+    return listings;
   },
   getListingById(id) {
     const listings = this.getListings();
     return listings.find(l => l.id === id) || null;
   },
+  // Only available and non-expired listings are discoverable by NGOs
   getAvailableListings() {
     const listings = this.getListings();
-    return listings.filter(l => l.status === 'available');
+    return listings.filter(l => l.status === 'available' && !isListingExpired(l));
   },
   getDonorListings(donorId) {
     const listings = this.getListings();
     return listings.filter(l => l.donorId === donorId);
   },
   createListing(listingData) {
-    const listings = this.getListings();
+    const listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
+
+    // Compute ISO expiration date
+    let expiresAt = listingData.expiresAt;
+    if (!expiresAt) {
+      // Default to 6 hours from now if not explicitly passed
+      expiresAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+    }
+
     const newListing = {
-      id: 'food_' + Date.now(),
-      status: 'available',
-      qualityScore: listingData.qualityScore || Math.floor(Math.random() * 12) + 85,
-      qualityStatus: 'Good Quality',
+      id: 'food_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      donorId: listingData.donorId,
+      donorName: listingData.donorName,
+      foodName: listingData.foodName,
+      category: listingData.category,
+      description: listingData.description || '',
+      quantity: Number(listingData.quantity),
+      unit: listingData.unit || 'kg',
+      foodType: listingData.foodType || 'Vegetarian',
+      preparedAt: listingData.preparedAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      pickupDeadline: listingData.pickupDeadline || 'Within 6 hours',
+      expiresAt,
+      imageURL: listingData.imageURL || '',
+      pickupAddress: listingData.pickupAddress || '',
+      latitude: listingData.latitude || 26.8520,
+      longitude: listingData.longitude || 75.8050,
+      listingType: listingData.listingType || 'free', // 'free' | 'paid'
+      price: listingData.listingType === 'paid' ? Number(listingData.price || 0) : 0,
+      qualityScore: listingData.qualityScore || 88,
+      qualityStatus: listingData.qualityStatus || 'Good Quality',
+      qualityAnalysis: listingData.qualityAnalysis || null,
+      status: 'available', // available | accepted | pickup_started | picked_up | delivered | cancelled | expired
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      ...listingData
+      updatedAt: new Date().toISOString()
     };
+
     listings.unshift(newListing);
     saveStorage(STORAGE_KEYS.LISTINGS, listings);
 
-    // Create notification for NGOs
-    notificationService.createNotification({
-      userId: 'user_ngo_1',
-      title: 'New Food Listing Available Nearby',
-      message: `${newListing.donorName || 'A local donor'} listed ${newListing.quantity} ${newListing.unit} of ${newListing.foodName}.`,
-      type: 'new_food',
-      relatedId: newListing.id
+    // Notify registered NGOs
+    const allUsers = userService.getUsers();
+    const ngos = allUsers.filter(u => u.role === 'ngo');
+    ngos.forEach(ngo => {
+      notificationService.createNotification({
+        userId: ngo.id,
+        title: 'New Food Listing Available Nearby',
+        message: `${newListing.donorName} listed ${newListing.quantity} ${newListing.unit} of ${newListing.foodName} (${newListing.listingType === 'paid' ? `₹${newListing.price}` : 'FREE'}).`,
+        type: 'new_food',
+        relatedId: newListing.id
+      });
     });
 
     return newListing;
   },
   updateListing(id, updates) {
-    const listings = this.getListings();
+    const listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
     const index = listings.findIndex(l => l.id === id);
     if (index !== -1) {
       listings[index] = { ...listings[index], ...updates, updatedAt: new Date().toISOString() };
@@ -424,7 +243,7 @@ export const foodService = {
     return null;
   },
   deleteListing(id) {
-    let listings = this.getListings();
+    let listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
     listings = listings.filter(l => l.id !== id);
     saveStorage(STORAGE_KEYS.LISTINGS, listings);
     return true;
@@ -436,7 +255,7 @@ export const foodService = {
 // -------------------------------------------------------------
 export const donationService = {
   getDonations() {
-    return loadStorage(STORAGE_KEYS.DONATIONS, INITIAL_DONATIONS);
+    return loadStorage(STORAGE_KEYS.DONATIONS, []);
   },
   getDonationById(id) {
     const donations = this.getDonations();
@@ -451,29 +270,44 @@ export const donationService = {
     }
     return donations;
   },
-  acceptDonation(foodListingId, ngoUser) {
+  acceptDonation(foodListingId, ngoUser, paymentDetails = null) {
     const listing = foodService.getListingById(foodListingId);
     if (!listing) throw new Error('Listing not found');
-    if (listing.status !== 'available') throw new Error('This food listing is no longer available.');
+    
+    // Check if expired
+    if (isListingExpired(listing)) {
+      foodService.updateListing(foodListingId, { status: 'expired' });
+      throw new Error('This surplus food listing has expired and can no longer be accepted.');
+    }
+
+    if (listing.status !== 'available') {
+      throw new Error('This food listing is no longer available.');
+    }
 
     // 1. Mark listing as accepted
     foodService.updateListing(foodListingId, { status: 'accepted' });
 
     // 2. Create donation record
-    const donations = this.getDonations();
+    const donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
     const newDonation = {
-      id: 'donation_' + Date.now(),
+      id: 'donation_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       foodListingId: listing.id,
       foodName: listing.foodName,
       donorId: listing.donorId,
-      donorName: listing.donorName || 'Hotel Green Valley',
+      donorName: listing.donorName,
       ngoId: ngoUser.id,
-      ngoName: ngoUser.organizationName || ngoUser.name || 'Hope Foundation',
+      ngoName: ngoUser.organizationName || ngoUser.name,
       quantity: `${listing.quantity} ${listing.unit}`,
       imageURL: listing.imageURL,
       pickupAddress: listing.pickupAddress,
       latitude: listing.latitude,
       longitude: listing.longitude,
+      listingType: listing.listingType,
+      price: listing.price,
+      // Payment information for paid listings
+      paymentMethod: paymentDetails?.method || (listing.listingType === 'paid' ? 'pickup_cash' : 'free'),
+      paymentStatus: paymentDetails?.status || (listing.listingType === 'paid' ? 'pending' : 'completed'),
+      transactionRef: paymentDetails?.transactionRef || null,
       status: 'accepted', // POSTED -> ACCEPTED -> PICKUP STARTED -> PICKED UP -> DELIVERED
       acceptedAt: new Date().toISOString(),
       pickupStartedAt: null,
@@ -485,11 +319,11 @@ export const donationService = {
     donations.unshift(newDonation);
     saveStorage(STORAGE_KEYS.DONATIONS, donations);
 
-    // 3. Create notification for donor
+    // 3. Notify Donor
     notificationService.createNotification({
       userId: listing.donorId,
       title: 'Donation Accepted!',
-      message: `${newDonation.ngoName} has accepted your listing: ${listing.foodName}.`,
+      message: `${newDonation.ngoName} has accepted your listing: ${listing.foodName}.${listing.listingType === 'paid' ? ` (Payment: ${newDonation.paymentMethod === 'direct_upi' ? 'Paid via UPI' : 'Pay on Collection'})` : ''}`,
       type: 'donation_accepted',
       relatedId: newDonation.id
     });
@@ -497,7 +331,7 @@ export const donationService = {
     return newDonation;
   },
   updateStatus(donationId, nextStatus) {
-    const donations = this.getDonations();
+    const donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
     const donation = donations.find(d => d.id === donationId);
     if (!donation) throw new Error('Donation not found');
 
@@ -511,12 +345,12 @@ export const donationService = {
 
     saveStorage(STORAGE_KEYS.DONATIONS, donations);
 
-    // Update listing status correspondingly
+    // Also sync listing status
     if (donation.foodListingId) {
       foodService.updateListing(donation.foodListingId, { status: nextStatus });
     }
 
-    // Notify donor & NGO
+    // Notify Donor
     const statusTitles = {
       pickup_started: 'Pickup Has Started',
       picked_up: 'Food Picked Up Successfully',
@@ -525,7 +359,7 @@ export const donationService = {
     notificationService.createNotification({
       userId: donation.donorId,
       title: statusTitles[nextStatus] || 'Donation Status Updated',
-      message: `Status of ${donation.foodName} changed to: ${nextStatus.replace('_', ' ').toUpperCase()}`,
+      message: `Status of ${donation.foodName} is now: ${nextStatus.replace('_', ' ').toUpperCase()}`,
       type: 'status_update',
       relatedId: donation.id
     });
@@ -535,19 +369,64 @@ export const donationService = {
 };
 
 // -------------------------------------------------------------
+// MUNICIPAL WASTE MANAGEMENT SERVICES (Section 6)
+// For expired/spoiled surplus food disposal
+// -------------------------------------------------------------
+export const wasteService = {
+  getRequests() {
+    return loadStorage(STORAGE_KEYS.WASTE_REQUESTS, []);
+  },
+  getDonorRequests(donorId) {
+    const all = this.getRequests();
+    return all.filter(r => r.donorId === donorId);
+  },
+  createWasteRequest({ donorId, donorName, foodListingId, foodName, quantity, spoilageReason, regionWard, address, preferredSlot }) {
+    const requests = loadStorage(STORAGE_KEYS.WASTE_REQUESTS, []);
+    const ticketNumber = 'MC-WASTE-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
+
+    const newRequest = {
+      id: 'waste_' + Date.now(),
+      ticketNumber,
+      donorId,
+      donorName,
+      foodListingId: foodListingId || null,
+      foodName,
+      quantity,
+      spoilageReason: spoilageReason || 'Past safe consumption window / Expiration',
+      regionWard: regionWard || 'Zone 1 - Central Ward',
+      address,
+      preferredSlot: preferredSlot || 'Morning (8:00 AM - 11:00 AM)',
+      status: 'scheduled', // 'requested' | 'scheduled' | 'collected'
+      wasteDestination: 'Municipal Organic Composting & Biogas Facility',
+      createdAt: new Date().toISOString()
+    };
+
+    requests.unshift(newRequest);
+    saveStorage(STORAGE_KEYS.WASTE_REQUESTS, requests);
+
+    // If linked to listing, mark listing status
+    if (foodListingId) {
+      foodService.updateListing(foodListingId, { status: 'waste_collection_requested' });
+    }
+
+    return newRequest;
+  }
+};
+
+// -------------------------------------------------------------
 // CHAT & MESSAGING SERVICES
 // -------------------------------------------------------------
 export const messageService = {
   getMessages(conversationId) {
-    const all = loadStorage(STORAGE_KEYS.MESSAGES, INITIAL_MESSAGES);
+    const all = loadStorage(STORAGE_KEYS.MESSAGES, []);
     if (!conversationId) return all;
     return all.filter(m => m.conversationId === conversationId);
   },
   sendMessage({ conversationId, senderId, senderName, receiverId, message }) {
-    const messages = loadStorage(STORAGE_KEYS.MESSAGES, INITIAL_MESSAGES);
+    const messages = loadStorage(STORAGE_KEYS.MESSAGES, []);
     const newMsg = {
       id: 'msg_' + Date.now(),
-      conversationId: conversationId || 'conv_donor1_ngo1',
+      conversationId: conversationId || 'conv_general',
       senderId,
       senderName,
       receiverId,
@@ -560,7 +439,7 @@ export const messageService = {
     return newMsg;
   },
   markRead(conversationId, currentUserId) {
-    const messages = loadStorage(STORAGE_KEYS.MESSAGES, INITIAL_MESSAGES);
+    const messages = loadStorage(STORAGE_KEYS.MESSAGES, []);
     let updated = false;
     messages.forEach(m => {
       if (m.conversationId === conversationId && m.receiverId === currentUserId && !m.read) {
@@ -577,7 +456,7 @@ export const messageService = {
 // -------------------------------------------------------------
 export const notificationService = {
   getNotifications(userId) {
-    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, []);
     if (!userId) return all;
     return all.filter(n => n.userId === userId || n.userId === 'all');
   },
@@ -586,7 +465,7 @@ export const notificationService = {
     return list.filter(n => !n.read).length;
   },
   createNotification(notifData) {
-    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, []);
     const newNotif = {
       id: 'notif_' + Date.now(),
       read: false,
@@ -597,16 +476,8 @@ export const notificationService = {
     saveStorage(STORAGE_KEYS.NOTIFICATIONS, all);
     return newNotif;
   },
-  markAsRead(id) {
-    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    const notif = all.find(n => n.id === id);
-    if (notif) {
-      notif.read = true;
-      saveStorage(STORAGE_KEYS.NOTIFICATIONS, all);
-    }
-  },
   markAllAsRead(userId) {
-    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    const all = loadStorage(STORAGE_KEYS.NOTIFICATIONS, []);
     all.forEach(n => {
       if (n.userId === userId || n.userId === 'all') n.read = true;
     });

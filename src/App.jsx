@@ -13,6 +13,7 @@ import DonorDashboard from './pages/donor/DonorDashboard';
 import AddFoodPage from './pages/donor/AddFoodPage';
 import MyListingsPage from './pages/donor/MyListingsPage';
 import DonorTrackingPage from './pages/donor/DonorTrackingPage';
+import WasteManagementPage from './pages/donor/WasteManagementPage';
 
 // NGO Pages
 import NGODashboard from './pages/ngo/NGODashboard';
@@ -66,6 +67,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['donor']}>
               <DonorTrackingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/donor/waste-management"
+          element={
+            <ProtectedRoute allowedRoles={['donor']}>
+              <WasteManagementPage />
             </ProtectedRoute>
           }
         />

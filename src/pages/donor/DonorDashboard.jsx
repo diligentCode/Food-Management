@@ -19,6 +19,10 @@ export default function DonorDashboard() {
     }
   }, [currentUser]);
 
+  const activeListingsCount = listings.filter(l => l.status === 'available').length;
+  const totalKg = listings.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+  const totalTons = (totalKg / 1000).toFixed(2);
+
   return (
     <div className="dashboard-layout">
       <Sidebar />
@@ -26,12 +30,12 @@ export default function DonorDashboard() {
         <AppNavbar title="Donor Dashboard" />
 
         <div className="dashboard-body">
-          {/* Header Greeting & Top Impact Highlight (Matching Reference Image 1) */}
+          {/* Header Greeting & Top Impact Highlight */}
           <div className="dashboard-header-row">
             <div className="greeting-text">
-              <h1>Welcome back, {currentUser?.name || 'Hotel Green Valley'}! 🍃</h1>
+              <h1>Welcome back, {currentUser?.organizationName || currentUser?.name || 'Food Donor'}! 🍃</h1>
               <p>
-                Your extra food can make a big difference. List surplus food and help those in need.
+                Every extra meal makes a difference. Post surplus edible food so local charities and verified NGOs can distribute it immediately.
               </p>
             </div>
 
@@ -39,10 +43,10 @@ export default function DonorDashboard() {
             <div className="impact-highlight-card">
               <div className="impact-highlight-info">
                 <span className="impact-highlight-label">
-                  <span>🍃</span> Total Food Donated
+                  <span>🍃</span> Total Food Listed
                 </span>
-                <span className="impact-highlight-val">2.6 Tons</span>
-                <span className="impact-highlight-sub">This month</span>
+                <span className="impact-highlight-val">{totalKg} kg</span>
+                <span className="impact-highlight-sub">{totalTons} Tons diverted from waste</span>
               </div>
               <div className="impact-highlight-icon">
                 🥗
@@ -50,57 +54,57 @@ export default function DonorDashboard() {
             </div>
           </div>
 
-          {/* 4 Metrics Cards (Matching Reference Image 1) */}
+          {/* 4 Metrics Cards */}
           <div className="metrics-grid">
             <Link to="/donor/listings" className="metric-card">
               <div className="metric-icon-circle" style={{ backgroundColor: '#e6f4ea', color: '#126343' }}>
                 🍴
               </div>
               <div className="metric-data">
-                <div className="metric-number">{listings.length || 4}</div>
+                <div className="metric-number">{activeListingsCount}</div>
                 <div className="metric-label">Active Listings</div>
               </div>
               <span className="metric-chevron">&gt;</span>
             </Link>
 
-            <div className="metric-card">
+            <Link to="/donor/tracking" className="metric-card">
               <div className="metric-icon-circle" style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
                 👥
               </div>
               <div className="metric-data">
-                <div className="metric-number">3</div>
-                <div className="metric-label">NGOs Reached</div>
-              </div>
-              <span className="metric-chevron">&gt;</span>
-            </div>
-
-            <Link to="/donor/tracking" className="metric-card">
-              <div className="metric-icon-circle" style={{ backgroundColor: '#f3e8ff', color: '#9333ea' }}>
-                💜
-              </div>
-              <div className="metric-data">
-                <div className="metric-number">2.6 Tons</div>
-                <div className="metric-label">Food Donated</div>
+                <div className="metric-number">{activeDonations.length}</div>
+                <div className="metric-label">Accepted Donations</div>
               </div>
               <span className="metric-chevron">&gt;</span>
             </Link>
 
-            <div className="metric-card">
-              <div className="metric-icon-circle" style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
-                🍃
+            <Link to="/donor/waste-management" className="metric-card">
+              <div className="metric-icon-circle" style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
+                ♻️
               </div>
               <div className="metric-data">
-                <div className="metric-number">1.2 Tons</div>
-                <div className="metric-label">Food Saved</div>
+                <div className="metric-number">Municipal</div>
+                <div className="metric-label">Waste Composting</div>
               </div>
               <span className="metric-chevron">&gt;</span>
-            </div>
+            </Link>
+
+            <Link to="/donor/add-food" className="metric-card">
+              <div className="metric-icon-circle" style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
+                ➕
+              </div>
+              <div className="metric-data">
+                <div className="metric-number">New</div>
+                <div className="metric-label">List Surplus Food</div>
+              </div>
+              <span className="metric-chevron">&gt;</span>
+            </Link>
           </div>
 
-          {/* Recent Listings Section (Matching Reference Image 1) */}
+          {/* Recent Listings Section */}
           <div className="dashboard-card-container">
             <div className="card-header-row">
-              <h2 className="card-header-title">Recent Listings</h2>
+              <h2 className="card-header-title">Recent Surplus Postings</h2>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <Link to="/donor/add-food" className="btn btn-primary btn-sm">
                   + Add Surplus Food
@@ -113,53 +117,68 @@ export default function DonorDashboard() {
 
             <div className="listings-list">
               {listings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-muted)' }}>
-                  <p>You haven't listed any surplus food yet.</p>
-                  <Link to="/donor/add-food" className="btn btn-primary btn-sm" style={{ marginTop: '12px' }}>
-                    Create Your First Listing
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🍲</div>
+                  <h3 style={{ color: '#0f172a', fontWeight: 800 }}>No Surplus Food Listed Yet</h3>
+                  <p style={{ marginTop: '8px', maxWidth: '440px', margin: '8px auto 0 auto', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                    Your surplus kitchen meals can feed dozens of community members. Click below to publish your first surplus food batch in under a minute!
+                  </p>
+                  <Link to="/donor/add-food" className="btn btn-primary btn-sm" style={{ marginTop: '16px' }}>
+                    + Publish Your First Food Listing
                   </Link>
                 </div>
               ) : (
-                listings.slice(0, 4).map((item) => (
+                listings.slice(0, 5).map((item) => (
                   <div key={item.id} className="listing-row-card">
                     <div className="listing-thumb-wrap">
-                      <img
-                        src={item.imageURL || '/images/1.jpg'}
-                        alt={item.foodName}
-                        className="listing-thumb"
-                        onError={(e) => { e.target.src = '/images/1.jpg'; }}
-                      />
+                      {item.imageURL ? (
+                        <img
+                          src={item.imageURL}
+                          alt={item.foodName}
+                          className="listing-thumb"
+                        />
+                      ) : (
+                        <div className="listing-thumb flex-center" style={{ background: '#e2e8f0', fontSize: '1.8rem' }}>
+                          🍲
+                        </div>
+                      )}
                     </div>
 
                     <div className="listing-info">
                       <div className="listing-info-top">
                         <h3 className="listing-food-name">{item.foodName}</h3>
+                        {item.listingType === 'paid' ? (
+                          <span className="badge badge-warning">
+                            PAID: ₹{item.price}/{item.unit}
+                          </span>
+                        ) : (
+                          <span className="badge badge-success">
+                            100% FREE
+                          </span>
+                        )}
                       </div>
                       <div className="listing-donor-name">
-                        <span>🏨</span> {item.donorName || currentUser?.name || 'Hotel Green Valley'}
+                        <span>🏨</span> {item.donorName || currentUser?.organizationName}
                       </div>
                       <div className="listing-meta-row">
                         <span className="meta-pill pill-muted">
                           🕒 Quantity: {item.quantity} {item.unit}
                         </span>
                         <span className="meta-pill pill-muted">
-                          Prepared: {item.preparedAt}
+                          ⏰ {item.pickupDeadline}
                         </span>
                         <span className="meta-pill pill-fresh">
-                          Fresh
-                        </span>
-                        <span className="meta-pill pill-muted">
-                          2 hours old
+                          AI Freshness: {item.qualityScore || 88}/100
                         </span>
                       </div>
                     </div>
 
                     <div className="listing-actions-col">
-                      <span className="badge badge-success">
-                        ● {item.status.toUpperCase()}
+                      <span className={`badge ${item.status === 'expired' ? 'badge-warning' : 'badge-success'}`}>
+                        ● {item.status.replace('_', ' ').toUpperCase()}
                       </span>
-                      <Link to={`/donor/listings`} className="btn btn-primary btn-sm">
-                        View Details &rarr;
+                      <Link to="/donor/listings" className="btn btn-primary btn-sm">
+                        Manage Listing &rarr;
                       </Link>
                     </div>
                   </div>

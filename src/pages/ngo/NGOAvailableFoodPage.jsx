@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { foodService, donationService } from '../../services/dataService';
+import { foodService, donationService, isListingExpired } from '../../services/dataService';
 
 export default function NGOAvailableFoodPage() {
   const { currentUser } = useAuth();
@@ -11,6 +11,8 @@ export default function NGOAvailableFoodPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDiet, setSelectedDiet] = useState('all');
   const [selectedType, setSelectedType] = useState('all'); // all, free, paid
+  const [acceptingItem, setAcceptingItem] = useState(null);
+  const [paymentOption, setPaymentOption] = useState('pickup_cash');
 
   const loadListings = () => {
     setListings(foodService.getAvailableListings());
@@ -20,10 +22,25 @@ export default function NGOAvailableFoodPage() {
     loadListings();
   }, []);
 
-  const handleAccept = (food) => {
+  const handleConfirmAccept = () => {
+    if (!acceptingItem) return;
     try {
-      donationService.acceptDonation(food.id, currentUser || { id: 'user_ngo_1', name: 'Hope Foundation' });
-      alert(`Success! You have accepted ${food.foodName}. Check 'My Distributions' to track.`);
+      const isPaid = acceptingItem.listingType === 'paid';
+      const paymentDetails = isPaid ? {
+        method: paymentOption,
+        status: paymentOption === 'direct_upi' ? 'completed' : 'pending',
+        transactionRef: paymentOption === 'direct_upi' ? `UPI-2026-${Math.floor(100000 + Math.random() * 900000)}` : null,
+        amount: Number(acceptingItem.price) * Number(acceptingItem.quantity)
+      } : null;
+
+      donationService.acceptDonation(
+        acceptingItem.id,
+        currentUser || { id: 'user_ngo_demo', organizationName: 'Verified NGO' },
+        paymentDetails
+      );
+
+      alert(`Success! You have accepted ${acceptingItem.foodName}. Track the collection in 'My Distributions'.`);
+      setAcceptingItem(null);
       loadListings();
     } catch (err) {
       alert(err.message || 'Error accepting food.');
@@ -79,7 +96,9 @@ export default function NGOAvailableFoodPage() {
                 <option value="all">All Categories</option>
                 <option value="Rice">Rice</option>
                 <option value="Curry">Curry</option>
+                <option value="Bread">Bread / Roti</option>
                 <option value="Vegetables">Vegetables</option>
+                <option value="Meals">Full Meals</option>
                 <option value="Desserts">Desserts</option>
               </select>
             </div>
@@ -104,7 +123,7 @@ export default function NGOAvailableFoodPage() {
               >
                 <option value="all">Free & Low-Cost</option>
                 <option value="free">100% Free Only</option>
-                <option value="paid">Low-Cost Sale</option>
+                <option value="paid">Low-Cost / Subsidized</option>
               </select>
             </div>
           </div>
@@ -113,69 +132,155 @@ export default function NGOAvailableFoodPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
             {filtered.length === 0 ? (
               <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-                <h3>No available listings match your filters.</h3>
+                <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🍲</div>
+                <h3 style={{ color: '#0f172a', fontWeight: 800 }}>No Surplus Food Listings Match Filters</h3>
+                <p style={{ marginTop: '6px' }}>Try resetting filters or check back shortly for new donor contributions.</p>
               </div>
             ) : (
-              filtered.map((food) => (
-                <div key={food.id} className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ height: '180px', position: 'relative', background: '#e2e8f0' }}>
-                    <img
-                      src={food.imageURL || '/images/1.jpg'}
-                      alt={food.foodName}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => { e.target.src = '/images/1.jpg'; }}
-                    />
-                    <span style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      backgroundColor: food.listingType === 'free' ? '#15803d' : '#b45309',
-                      color: '#ffffff',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      padding: '4px 10px',
-                      borderRadius: '9999px'
-                    }}>
-                      {food.listingType === 'free' ? 'FREE' : `₹${food.price}`}
-                    </span>
-                  </div>
+              filtered.map((food) => {
+                const expired = isListingExpired(food);
 
-                  <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
-                        {food.foodName}
-                      </h3>
-                      <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
-                        {food.category}
+                return (
+                  <div key={food.id} className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ height: '180px', position: 'relative', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {food.imageURL ? (
+                        <img
+                          src={food.imageURL}
+                          alt={food.foodName}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: '3rem' }}>🍲</div>
+                      )}
+
+                      <span style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        backgroundColor: food.listingType === 'free' ? '#15803d' : '#b45309',
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: '9999px'
+                      }}>
+                        {food.listingType === 'free' ? 'FREE' : `₹${food.price}/${food.unit}`}
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      🏨 {food.donorName}
+                    <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
+                          {food.foodName}
+                        </h3>
+                        <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
+                          {food.category}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                        🏨 {food.donorName}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
+                        <span className="meta-pill pill-muted">⚖️ {food.quantity} {food.unit}</span>
+                        <span className="meta-pill pill-fresh">AI: {food.qualityScore || 88}/100</span>
+                        {expired ? (
+                          <span className="meta-pill pill-expiry">⚠️ Expired</span>
+                        ) : (
+                          <span className="meta-pill pill-expiry">⏰ {food.pickupDeadline}</span>
+                        )}
+                      </div>
+
+                      <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4, margin: '4px 0' }}>
+                        {food.description}
+                      </p>
+
+                      <button
+                        onClick={() => setAcceptingItem(food)}
+                        disabled={expired}
+                        className="btn btn-primary"
+                        style={{ marginTop: 'auto', width: '100%', opacity: expired ? 0.5 : 1 }}
+                      >
+                        {expired ? 'Expired' : food.listingType === 'paid' ? '🤝 Accept & Settle (Paid)' : '🤝 Accept Food Donation'}
+                      </button>
                     </div>
-
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
-                      <span className="meta-pill pill-muted">⚖️ {food.quantity} {food.unit}</span>
-                      <span className="meta-pill pill-fresh">AI: {food.qualityScore || 88}/100</span>
-                      <span className="meta-pill pill-expiry">⏰ {food.pickupDeadline}</span>
-                    </div>
-
-                    <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4, margin: '4px 0' }}>
-                      {food.description}
-                    </p>
-
-                    <button
-                      onClick={() => handleAccept(food)}
-                      className="btn btn-primary"
-                      style={{ marginTop: 'auto', width: '100%' }}
-                    >
-                      🤝 Accept Food Donation
-                    </button>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
+
+          {/* Accept / Payment Modal */}
+          {acceptingItem && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 350,
+              padding: '20px'
+            }}>
+              <div className="card" style={{ maxWidth: '480px', width: '100%', padding: '28px' }}>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '8px' }}>
+                  Confirm Food Acceptance
+                </h3>
+                <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '16px' }}>
+                  You are accepting <strong>{acceptingItem.foodName}</strong> ({acceptingItem.quantity} {acceptingItem.unit}) from {acceptingItem.donorName}.
+                </p>
+
+                {acceptingItem.listingType === 'paid' ? (
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '14px', borderRadius: '8px', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <strong style={{ color: '#92400e', fontSize: '0.88rem' }}>Subsidized Amount:</strong>
+                      <span style={{ fontWeight: 800, color: '#b45309' }}>
+                        ₹{(Number(acceptingItem.price) * Number(acceptingItem.quantity)).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="payOpt"
+                          checked={paymentOption === 'pickup_cash'}
+                          onChange={() => setPaymentOption('pickup_cash')}
+                        />
+                        <span>Pay on Pickup (Cash / QR at kitchen)</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="payOpt"
+                          checked={paymentOption === 'direct_upi'}
+                          onChange={() => setPaymentOption('direct_upi')}
+                        />
+                        <span>Instant Direct UPI Settlement</span>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', color: '#15803d', fontWeight: 600 }}>
+                    ✓ 100% Free Humanitarian Donation (₹0 Cost)
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button onClick={() => setAcceptingItem(null)} className="btn btn-secondary btn-sm">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmAccept} className="btn btn-primary btn-sm">
+                    Confirm & Accept
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

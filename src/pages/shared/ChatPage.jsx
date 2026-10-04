@@ -98,49 +98,59 @@ export default function ChatPage() {
                   </span>
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Regarding: <strong>Veg Biryani Donation</strong>
+                  Channel: <strong>Surplus Food Pickup Coordination</strong>
                 </span>
               </div>
 
               {/* Messages Feed */}
               <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', background: '#f8fafc' }}>
-                {messages.map((m) => {
-                  const isMine = m.senderId === currentUser?.id;
+                {messages.length === 0 ? (
+                  <div style={{ margin: 'auto', textAlign: 'center', color: '#64748b', padding: '40px 20px' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>💬</div>
+                    <strong style={{ color: '#0f172a' }}>No Messages Exchanged Yet</strong>
+                    <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                      Send a message below or tap a quick reply to coordinate pickup times, gate entry, and packaging.
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((m) => {
+                    const isMine = m.senderId === currentUser?.id;
 
-                  return (
-                    <div
-                      key={m.id}
-                      style={{
-                        alignSelf: isMine ? 'flex-end' : 'flex-start',
-                        maxWidth: '70%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: isMine ? 'flex-end' : 'flex-start'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '2px' }}>
-                        {m.senderName}
-                      </div>
+                    return (
                       <div
+                        key={m.id}
                         style={{
-                          backgroundColor: isMine ? 'var(--color-primary-dark)' : '#ffffff',
-                          color: isMine ? '#ffffff' : '#0f172a',
-                          padding: '12px 16px',
-                          borderRadius: isMine ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                          fontSize: '0.92rem',
-                          lineHeight: 1.4,
-                          boxShadow: 'var(--shadow-sm)',
-                          border: isMine ? 'none' : '1px solid var(--color-border)'
+                          alignSelf: isMine ? 'flex-end' : 'flex-start',
+                          maxWidth: '70%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: isMine ? 'flex-end' : 'flex-start'
                         }}
                       >
-                        {m.message}
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '2px' }}>
+                          {m.senderName}
+                        </div>
+                        <div
+                          style={{
+                            backgroundColor: isMine ? 'var(--color-primary-dark)' : '#ffffff',
+                            color: isMine ? '#ffffff' : '#0f172a',
+                            padding: '12px 16px',
+                            borderRadius: isMine ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                            fontSize: '0.92rem',
+                            lineHeight: 1.4,
+                            boxShadow: 'var(--shadow-sm)',
+                            border: isMine ? 'none' : '1px solid var(--color-border)'
+                          }}
+                        >
+                          {m.message}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
-                        {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               {/* Quick Suggestion Pills */}

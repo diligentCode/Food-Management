@@ -1,19 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import { useAuth } from '../../context/AuthContext';
 import { foodService } from '../../services/dataService';
-
-const SAMPLE_PRESET_IMAGES = [
-  { label: 'Veg Biryani', path: '/images/1.jpg' },
-  { label: 'Paneer Curry', path: '/images/2.jpg' },
-  { label: 'Fresh Salad', path: '/images/3.jpg' },
-  { label: 'Dal Tadka', path: '/images/4.jpg' },
-  { label: 'Gulab Jamun', path: '/images/5.jpg' },
-  { label: 'Special Thali', path: '/images/6.jpg' }
-];
+import { analyzeFoodImage } from '../../services/aiService';
 
 export default function AddFoodPage() {
   const { currentUser } = useAuth();
@@ -26,24 +18,43 @@ export default function AddFoodPage() {
   const [unit, setUnit] = useState('kg');
   const [foodType, setFoodType] = useState('Vegetarian');
   const [preparedAt, setPreparedAt] = useState('Today, 11:30 AM');
-  const [pickupDeadline, setPickupDeadline] = useState('Today, 8:00 PM');
-  const [pickupAddress, setPickupAddress] = useState(currentUser?.address || 'Tonk Road, Jaipur');
-  const [listingType, setListingType] = useState('free'); // free | paid
-  const [price, setPrice] = useState(0);
-  const [imageURL, setImageURL] = useState('/images/1.jpg');
-  const [qualityScore, setQualityScore] = useState(89);
+  const [expiryHours, setExpiryHours] = useState('6');
+  const [pickupAddress, setPickupAddress] = useState(currentUser?.address || 'Hotel Kitchen Dispatch Gate');
+  const [listingType, setListingType] = useState('free'); // 'free' | 'paid'
+  const [price, setPrice] = useState(40);
+  const [imageURL, setImageURL] = useState('');
+  const [aiScore, setAiScore] = useState(88);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [analyzingAi, setAnalyzingAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Handle local image file selection
+  // Run AI Analysis whenever image or category changes
+  const runAiAnalysis = async (imgData, cat, name) => {
+    setAnalyzingAi(true);
+    try {
+      const result = await analyzeFoodImage({
+        imageDataUrl: imgData,
+        category: cat,
+        foodName: name || 'Surplus Meal'
+      });
+      setAiScore(result.score);
+      setAiAnalysis(result);
+    } catch (err) {
+      console.warn('AI analysis error:', err);
+    } finally {
+      setAnalyzingAi(false);
+    }
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImageURL(reader.result);
-        // Recalculate AI score estimate
-        setQualityScore(Math.floor(Math.random() * 10) + 85);
+        const dataUrl = reader.result;
+        setImageURL(dataUrl);
+        runAiAnalysis(dataUrl, category, foodName);
       };
       reader.readAsDataURL(file);
     }
@@ -54,36 +65,45 @@ export default function AddFoodPage() {
     setError('');
 
     if (!foodName.trim()) {
-      setError('Food name is required.');
+      setError('Food item name is required.');
       return;
     }
     if (!quantity || Number(quantity) <= 0) {
       setError('Please specify a positive food quantity.');
       return;
     }
+    if (listingType === 'paid' && (isNaN(price) || Number(price) <= 0)) {
+      setError('Please specify a valid subsidized price greater than ₹0.');
+      return;
+    }
 
     try {
       setSubmitting(true);
+      const hours = Number(expiryHours) || 6;
+      const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+      const pickupDeadline = `Within ${hours} hours (before ${new Date(Date.now() + hours * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+
       foodService.createListing({
-        donorId: currentUser?.id || 'user_donor_1',
-        donorName: currentUser?.organizationName || currentUser?.name || 'Hotel Green Valley',
-        foodName,
+        donorId: currentUser?.id,
+        donorName: currentUser?.organizationName || currentUser?.name,
+        foodName: foodName.trim(),
         category,
-        description: description || `Freshly prepared surplus ${foodName}.`,
+        description: description || `Freshly prepared ${foodType.toLowerCase()} ${foodName}.`,
         quantity: Number(quantity),
         unit,
         foodType,
         preparedAt,
         pickupDeadline,
-        expiresInText: 'Expires in 6h 00m',
-        imageURL,
+        expiresAt,
+        imageURL: imageURL || '',
         pickupAddress,
-        latitude: 26.8520,
-        longitude: 75.8050,
+        latitude: currentUser?.location?.lat || 26.8520,
+        longitude: currentUser?.location?.lng || 75.8050,
         listingType,
         price: listingType === 'paid' ? Number(price) : 0,
-        qualityScore,
-        qualityStatus: qualityScore >= 85 ? 'Good Quality' : 'Moderate Quality'
+        qualityScore: aiScore,
+        qualityStatus: aiScore >= 85 ? 'Good Quality' : 'Moderate Quality',
+        qualityAnalysis: aiAnalysis
       });
 
       navigate('/donor/listings');
@@ -100,13 +120,13 @@ export default function AddFoodPage() {
       <div className="dashboard-main">
         <AppNavbar title="List Surplus Food" />
 
-        <div className="dashboard-body" style={{ maxWidth: '960px', margin: '0 auto', width: '100%' }}>
+        <div className="dashboard-body" style={{ maxWidth: '980px', margin: '0 auto', width: '100%' }}>
           <div style={{ marginBottom: '24px' }}>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
               Add Surplus Food Listing 🍲
             </h1>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginTop: '4px' }}>
-              Publish your surplus edible food in 60 seconds so nearby verified NGOs can collect and distribute it.
+              Publish edible surplus food with photos and AI freshness scoring for verified NGOs to collect.
             </p>
           </div>
 
@@ -117,7 +137,7 @@ export default function AddFoodPage() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px' }}>
-            {/* Left Column: Form Fields */}
+            {/* Left Column: Form Details */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
@@ -128,7 +148,7 @@ export default function AddFoodPage() {
                   required
                   value={foodName}
                   onChange={(e) => setFoodName(e.target.value)}
-                  placeholder="e.g. Fresh Veg Biryani & Raita"
+                  placeholder="e.g. Steamed Rice, Dal Makhani & Roti"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                 />
               </div>
@@ -140,7 +160,10 @@ export default function AddFoodPage() {
                   </label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      runAiAnalysis(imageURL, e.target.value, foodName);
+                    }}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                   >
                     <option value="Rice">Rice</option>
@@ -181,7 +204,7 @@ export default function AddFoodPage() {
                     min="1"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="e.g. 25"
+                    placeholder="e.g. 20"
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                   />
                 </div>
@@ -196,8 +219,8 @@ export default function AddFoodPage() {
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                   >
                     <option value="kg">Kilograms (kg)</option>
-                    <option value="meals">Meals (approx. plates)</option>
-                    <option value="packs">Packets / Boxes</option>
+                    <option value="meals">Meals (plates)</option>
+                    <option value="packs">Boxes / Packets</option>
                   </select>
                 </div>
               </div>
@@ -205,7 +228,7 @@ export default function AddFoodPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                    Preparation Date & Time
+                    Preparation Time
                   </label>
                   <input
                     type="text"
@@ -218,36 +241,41 @@ export default function AddFoodPage() {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                    Pickup Deadline *
+                    Available Shelf Life *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={pickupDeadline}
-                    onChange={(e) => setPickupDeadline(e.target.value)}
-                    placeholder="e.g. Today, 8:00 PM"
+                  <select
+                    value={expiryHours}
+                    onChange={(e) => setExpiryHours(e.target.value)}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
-                  />
+                  >
+                    <option value="2">Available for 2 Hours</option>
+                    <option value="4">Available for 4 Hours</option>
+                    <option value="6">Available for 6 Hours (Recommended)</option>
+                    <option value="8">Available for 8 Hours</option>
+                    <option value="12">Available for 12 Hours</option>
+                    <option value="24">Available for 24 Hours</option>
+                  </select>
                 </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                  Pickup Address & Landmark
+                  Pickup Address & Gate Landmark
                 </label>
                 <input
                   type="text"
+                  required
                   value={pickupAddress}
                   onChange={(e) => setPickupAddress(e.target.value)}
-                  placeholder="e.g. Hotel Green Valley Back Gate, Tonk Road, Jaipur"
+                  placeholder="e.g. Hotel Service Gate, Loading Bay 1"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                 />
               </div>
 
-              {/* Free vs Low-Cost Sale (Section 18) */}
+              {/* Free vs Paid Low-Cost Listing (Section 18 & User Requirement 4) */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>
-                  Listing Type
+                  Listing Type & Pricing *
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <label style={{
@@ -269,7 +297,7 @@ export default function AddFoodPage() {
                     />
                     <div>
                       <strong style={{ fontSize: '0.88rem' }}>100% Free Donation</strong>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Donated at ₹0 cost</div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b' }}>₹0 cost to recipient NGO</div>
                     </div>
                   </label>
 
@@ -291,75 +319,95 @@ export default function AddFoodPage() {
                       onChange={() => setListingType('paid')}
                     />
                     <div>
-                      <strong style={{ fontSize: '0.88rem' }}>Low-Cost Sale</strong>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Nominal subsidized price</div>
+                      <strong style={{ fontSize: '0.88rem' }}>Low-Cost / Subsidized Sale</strong>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Nominal subsidized rate</div>
                     </div>
                   </label>
                 </div>
 
                 {listingType === 'paid' && (
-                  <div style={{ marginTop: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
-                      Price (₹ INR)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="e.g. 50"
-                      style={{ width: '160px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
-                    />
+                  <div style={{ marginTop: '12px', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '4px' }}>
+                          Subsidized Price per {unit} (₹ INR) *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                          placeholder="e.g. 40"
+                          style={{ width: '160px', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '16px' }}>
+                        Total settlement value: <strong>₹{(Number(price || 0) * Number(quantity || 0)).toLocaleString()}</strong>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '8px 0 0 0' }}>
+                      NGOs can settle this nominal fee at pickup or via direct UPI on collection.
+                    </p>
                   </div>
                 )}
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                  Description / Handling Instructions
+                  Packaging & Handover Instructions
                 </label>
                 <textarea
                   rows="3"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Packed in clean stainless containers. Keep refrigerated or distribute within 4 hours."
+                  placeholder="e.g. Packed in sanitized stainless vessels. Please bring clean containers for decanting."
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                 />
               </div>
 
-              <button type="submit" disabled={submitting} className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '10px' }}>
-                {submitting ? 'Publishing Listing...' : '🚀 Publish Surplus Food Listing'}
+              <button type="submit" disabled={submitting} className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '6px' }}>
+                {submitting ? 'Publishing Food Listing...' : '🚀 Publish Surplus Food Listing'}
               </button>
             </div>
 
-            {/* Right Column: Image Upload & AI Quality Assessment Preview */}
+            {/* Right Column: Image Upload & AI Quality Assessment */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="card">
+              <div className="card" style={{ padding: '24px' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '12px' }}>
-                  Food Photograph
+                  Food Photograph & Visual Inspection
                 </h3>
 
                 <div style={{
                   width: '100%',
-                  height: '200px',
+                  height: '220px',
                   borderRadius: '12px',
                   overflow: 'hidden',
-                  background: '#e2e8f0',
-                  marginBottom: '14px',
+                  background: '#f1f5f9',
+                  border: '2px dashed #cbd5e1',
+                  marginBottom: '16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  position: 'relative'
                 }}>
-                  <img
-                    src={imageURL}
-                    alt="Food Preview"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
+                  {imageURL ? (
+                    <img
+                      src={imageURL}
+                      alt="Food Preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>
+                      <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📸</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>No Food Photo Uploaded</div>
+                      <div style={{ fontSize: '0.75rem', marginTop: '4px' }}>Upload a photo to run the AI freshness inspection</div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Upload File Input */}
-                <label className="btn btn-secondary btn-sm" style={{ width: '100%', textAlign: 'center', cursor: 'pointer' }}>
-                  📷 Upload from Device
+                <label className="btn btn-primary btn-sm" style={{ width: '100%', textAlign: 'center', cursor: 'pointer' }}>
+                  📷 Upload Food Photo
                   <input
                     type="file"
                     accept="image/*"
@@ -367,41 +415,15 @@ export default function AddFoodPage() {
                     style={{ display: 'none' }}
                   />
                 </label>
-
-                {/* Preset Fast Picker */}
-                <div style={{ marginTop: '16px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#64748b' }}>
-                    Or Pick Sample Food:
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                    {SAMPLE_PRESET_IMAGES.map((preset) => (
-                      <button
-                        key={preset.path}
-                        type="button"
-                        onClick={() => {
-                          setImageURL(preset.path);
-                          setFoodName(preset.label);
-                          setQualityScore(Math.floor(Math.random() * 8) + 87);
-                        }}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          background: imageURL === preset.path ? '#0b462f' : '#ffffff',
-                          color: imageURL === preset.path ? '#ffffff' : '#334155',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
-              {/* AI Quality Card Preview */}
-              <AIQualityCard score={qualityScore} status="Good Quality" />
+              {/* AI Quality Card */}
+              <AIQualityCard
+                score={aiScore}
+                status={aiScore >= 85 ? 'Good Quality' : 'Moderate Quality'}
+                analysis={aiAnalysis}
+                loading={analyzingAi}
+              />
             </div>
           </form>
         </div>

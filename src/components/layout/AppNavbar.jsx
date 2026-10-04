@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/dataService';
 
 export default function AppNavbar({ searchTerm, onSearchChange, title }) {
-  const { currentUser, userRole, loginAsDonor, loginAsNGO, loginAsAdmin, logout } = useAuth();
+  const { currentUser, userRole, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotifs, setShowNotifs] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -30,17 +30,9 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
     }
   };
 
-  const handleRoleSwitch = (role) => {
-    if (role === 'donor') {
-      loginAsDonor();
-      navigate('/donor');
-    } else if (role === 'ngo') {
-      loginAsNGO();
-      navigate('/ngo');
-    } else if (role === 'admin') {
-      loginAsAdmin();
-      navigate('/admin');
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   return (
@@ -52,42 +44,25 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
             <span className="search-icon">🔍</span>
             <input
               type="text"
-              placeholder="Search by food, hotel, location, or donor..."
+              placeholder="Search by food name, category, or location..."
               value={searchTerm || ''}
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
         ) : (
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
-            {title || 'FoodConnect Portal'}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
+              {title || 'FoodConnect'}
+            </h2>
+            <span className="badge badge-green" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+              {userRole === 'donor' ? 'Donor Portal' : userRole === 'ngo' ? 'NGO Portal' : 'Admin'}
+            </span>
+          </div>
         )}
       </div>
 
       {/* Right Actions */}
       <div className="topbar-actions">
-        {/* Quick Demo Switcher */}
-        <div className="role-switcher" title="Quick Role Switcher for MVP Testing">
-          <button 
-            className={`role-switcher-btn ${userRole === 'donor' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('donor')}
-          >
-            Donor Mode
-          </button>
-          <button 
-            className={`role-switcher-btn ${userRole === 'ngo' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('ngo')}
-          >
-            NGO Mode
-          </button>
-          <button 
-            className={`role-switcher-btn ${userRole === 'admin' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('admin')}
-          >
-            Admin
-          </button>
-        </div>
-
         {/* Language */}
         <div className="lang-selector">
           <span>🌐</span> English ⌵
@@ -98,7 +73,7 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
           <button 
             className="topbar-notif-btn" 
             onClick={() => setShowNotifs(!showNotifs)}
-            title="View Notifications"
+            title="In-App Notifications"
           >
             🔔
             {unreadCount > 0 && <span className="notif-badge-pill">{unreadCount}</span>}
@@ -118,7 +93,7 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
               zIndex: 200
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>In-App Notifications</strong>
+                <strong style={{ fontSize: '0.92rem', color: '#0f172a' }}>Notifications</strong>
                 {unreadCount > 0 && (
                   <button 
                     onClick={handleMarkAllRead} 
@@ -157,15 +132,30 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
           )}
         </div>
 
-        {/* User Pill */}
-        <div className="topbar-user" onClick={logout} title="Click to Sign Out">
-          <div className="user-avatar-circle">
-            {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'FC'}
+        {/* User Pill & Sign Out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="topbar-user" style={{ cursor: 'default' }}>
+            <div className="user-avatar-circle">
+              {currentUser?.organizationName ? currentUser.organizationName.substring(0, 2).toUpperCase() : 'FC'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', lineHeight: 1.1 }}>
+              <span className="user-name-label" style={{ fontSize: '0.82rem' }}>
+                {currentUser?.organizationName || currentUser?.name || 'Account'}
+              </span>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+                {userRole}
+              </span>
+            </div>
           </div>
-          <span className="user-name-label">
-            {currentUser?.name || 'Guest'}
-          </span>
-          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>🚪</span>
+
+          <button 
+            onClick={handleLogout} 
+            className="btn btn-secondary btn-sm"
+            style={{ fontSize: '0.78rem', padding: '6px 10px', color: '#dc2626' }}
+            title="Sign out of FoodConnect"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     </header>

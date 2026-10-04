@@ -1,25 +1,22 @@
 // ===================================================================
-// FOODCONNECT - AUTHENTICATION & USER ROLES CONTEXT
-// Manages authentication state, user roles (donor, ngo, admin),
-// login, registration, logout, and role redirection.
+// FOODCONNECT - AUTHENTICATION & STRICT ROLE ACCESS CONTROL
+// Manages authentication state, strict role enforcement (donor vs ngo),
+// and session persistence.
 // ===================================================================
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { userService } from '../services/dataService';
 
 const AuthContext = createContext(null);
-
-const STORAGE_AUTH_KEY = 'foodconnect_active_user';
+const STORAGE_AUTH_KEY = 'foodconnect_session_user_v2';
 
 export function AuthProvider({ children }) {
-  // Default to Donor (Hotel Green Valley) or saved active user
+  // Start with saved logged-in session, or null if no user is signed in
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_AUTH_KEY);
       if (saved) return JSON.parse(saved);
-      // Default to Hotel Green Valley from reference image
-      const users = userService.getUsers();
-      return users.find(u => u.role === 'donor') || users[0];
+      return null;
     } catch (e) {
       return null;
     }
@@ -40,9 +37,9 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const users = userService.getUsers();
-      const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      const found = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
       if (!found) {
-        throw new Error('No user found with this email. Please check your email or register.');
+        throw new Error('No registered account found with this email. Please register first.');
       }
       setCurrentUser(found);
       return found;
@@ -56,20 +53,19 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const users = userService.getUsers();
-      const existing = users.find(u => u.email.toLowerCase() === userData.email.toLowerCase());
+      const existing = users.find(u => u.email.toLowerCase() === userData.email.trim().toLowerCase());
       if (existing) {
         throw new Error('An account with this email already exists.');
       }
 
       const newUser = userService.createUser({
-        name: userData.name,
-        email: userData.email,
-        phone: userData.phone || '+91 98765 00000',
-        role: userData.role || 'donor', // 'donor' or 'ngo'
-        organizationName: userData.organizationName || userData.name,
-        address: userData.address || 'Local City, India',
-        location: { lat: 26.9124, lng: 75.7873 },
-        isVerified: false
+        name: userData.name || userData.organizationName,
+        organizationName: userData.organizationName,
+        email: userData.email.trim(),
+        phone: userData.phone || '',
+        role: userData.role, // strictly 'donor' or 'ngo'
+        address: userData.address || '',
+        location: { lat: 26.9124, lng: 75.7873 }
       });
 
       setCurrentUser(newUser);
@@ -79,31 +75,55 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Quick Demo Logins for instant evaluation
-  const loginAsDonor = () => {
+  // Quick Account Generators for testing (creates fresh isolated accounts if not present)
+  const quickTestLogin = (role) => {
     const users = userService.getUsers();
-    const donor = users.find(u => u.role === 'donor') || users[0];
-    setCurrentUser(donor);
-    return donor;
-  };
+    let account = users.find(u => u.role === role);
 
-  const loginAsNGO = () => {
-    const users = userService.getUsers();
-    const ngo = users.find(u => u.role === 'ngo') || users[1];
-    setCurrentUser(ngo);
-    return ngo;
-  };
+    if (!account) {
+      if (role === 'donor') {
+        account = userService.createUser({
+          name: 'Green Valley Grand Hotel',
+          organizationName: 'Green Valley Grand Hotel & Banquets',
+          email: 'donor@greenvalley.com',
+          phone: '+91 98290 11223',
+          role: 'donor',
+          address: 'Tonk Road, Jaipur',
+          location: { lat: 26.8520, lng: 75.8050 },
+          isVerified: true
+        });
+      } else if (role === 'ngo') {
+        account = userService.createUser({
+          name: 'Hope Relief Foundation',
+          organizationName: 'Hope Relief Foundation',
+          email: 'contact@hoperelief.ngo',
+          phone: '+91 98765 44332',
+          role: 'ngo',
+          address: 'Adarsh Nagar, Jaipur',
+          location: { lat: 26.8920, lng: 75.8250 },
+          isVerified: true
+        });
+      } else if (role === 'admin') {
+        account = userService.createUser({
+          name: 'Platform Administrator',
+          organizationName: 'FoodConnect Operations',
+          email: 'admin@foodconnect.org',
+          phone: '+91 11 2233 4455',
+          role: 'admin',
+          address: 'Central Secretariat, Delhi',
+          isVerified: true
+        });
+      }
+    }
 
-  const loginAsAdmin = () => {
-    const users = userService.getUsers();
-    const admin = users.find(u => u.role === 'admin') || users[2];
-    setCurrentUser(admin);
-    return admin;
+    setCurrentUser(account);
+    return account;
   };
 
   // Logout
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(STORAGE_AUTH_KEY);
   };
 
   // Update profile
@@ -123,9 +143,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     updateProfile,
-    loginAsDonor,
-    loginAsNGO,
-    loginAsAdmin
+    quickTestLogin
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

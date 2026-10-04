@@ -65,6 +65,12 @@ export default function Sidebar() {
               </NavLink>
             </li>
             <li className="sidebar-item">
+              <NavLink to="/donor/waste-management" className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="sidebar-item-icon">♻️</span>
+                <span>Waste Management</span>
+              </NavLink>
+            </li>
+            <li className="sidebar-item">
               <NavLink to="/donor/messages" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">💬</span>
                 <span>Chat & Messages</span>

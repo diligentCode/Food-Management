@@ -5,19 +5,20 @@ import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import FoodConnectMap from '../../components/common/FoodConnectMap';
 import { useAuth } from '../../context/AuthContext';
-import { foodService, donationService } from '../../services/dataService';
+import { foodService, donationService, isListingExpired, calculateDistanceKm } from '../../services/dataService';
 import '../../styles/Dashboard.css';
 
 export default function NGODashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState('new'); // new | in_progress | completed
+  const [activeTab, setActiveTab] = useState('new'); // 'new' | 'in_progress' | 'completed'
   const [searchTerm, setSearchTerm] = useState('');
   const [availableListings, setAvailableListings] = useState([]);
   const [acceptedDonations, setAcceptedDonations] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
+  const [paymentOption, setPaymentOption] = useState('pickup_cash'); // 'pickup_cash' | 'direct_upi'
   const [successMessage, setSuccessMessage] = useState('');
 
   const loadData = () => {
@@ -29,17 +30,38 @@ export default function NGODashboard() {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Handle Accept Donation (Section 24)
+  // Handle Accept Donation with optional payment
   const handleAcceptFood = async (food) => {
+    if (isListingExpired(food)) {
+      alert('This food listing has expired and cannot be accepted.');
+      loadData();
+      return;
+    }
+
     try {
       setAcceptingId(food.id);
-      donationService.acceptDonation(food.id, currentUser || { id: 'user_ngo_1', name: 'Hope Foundation' });
-      setSuccessMessage(`Success! You have accepted ${food.foodName} from ${food.donorName}.`);
+      const isPaid = food.listingType === 'paid';
+      const paymentDetails = isPaid ? {
+        method: paymentOption,
+        status: paymentOption === 'direct_upi' ? 'completed' : 'pending',
+        transactionRef: paymentOption === 'direct_upi' ? `UPI-2026-${Math.floor(100000 + Math.random() * 900000)}` : null,
+        amount: Number(food.price) * Number(food.quantity)
+      } : null;
+
+      donationService.acceptDonation(
+        food.id,
+        currentUser || { id: 'user_ngo_demo', organizationName: 'Verified NGO Partner' },
+        paymentDetails
+      );
+
+      setSuccessMessage(`Success! You have accepted ${food.foodName} from ${food.donorName}.${isPaid ? ` Payment: ${paymentOption === 'direct_upi' ? 'Settled via Instant UPI' : 'Pay on Collection'}.` : ''}`);
       setSelectedFood(null);
       loadData();
-      setTimeout(() => setSuccessMessage(''), 5000);
+      setTimeout(() => setSuccessMessage(''), 6000);
     } catch (err) {
       alert(err.message || 'Could not accept donation.');
     } finally {
@@ -47,7 +69,6 @@ export default function NGODashboard() {
     }
   };
 
-  // Filter listings by search
   const filteredListings = availableListings.filter((item) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -58,6 +79,9 @@ export default function NGODashboard() {
       item.pickupAddress.toLowerCase().includes(term)
     );
   });
+
+  const inProgressDonations = acceptedDonations.filter(d => d.status !== 'delivered');
+  const completedDonations = acceptedDonations.filter(d => d.status === 'delivered');
 
   return (
     <div className="dashboard-layout">
@@ -70,29 +94,33 @@ export default function NGODashboard() {
         />
 
         <div className="dashboard-body">
-          {/* Header Greeting & Your Impact (Matching Reference Image 2) */}
+          {/* Header Greeting & Real-Time Impact */}
           <div className="dashboard-header-row">
             <div className="greeting-text">
-              <h1>Welcome back, {currentUser?.name || 'Hope Foundation'}! 💚</h1>
+              <h1>Welcome back, {currentUser?.organizationName || currentUser?.name || 'NGO Partner'}! 💚</h1>
               <p>
-                New food donations are waiting for your acceptance. Help us reduce food waste and bring smiles to those in need.
+                Discover surplus food postings in your zone. Connect instantly with donors to rescue wholesome meals.
               </p>
             </div>
 
-            {/* Impact Box */}
+            {/* Live Impact Card */}
             <div className="impact-highlight-card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
               <div className="impact-highlight-info">
                 <span className="impact-highlight-label" style={{ color: '#15803d' }}>
-                  <span>🌱</span> Your Impact
+                  <span>🌱</span> Your Live Rescue Impact
                 </span>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'baseline', marginTop: '6px' }}>
                   <div>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0b462f' }}>125+</span>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Meals Distributed</div>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0b462f' }}>
+                      {acceptedDonations.length}
+                    </span>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Active Donations</div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0b462f' }}>8.5 Tons</span>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Food Saved</div>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0b462f' }}>
+                      {completedDonations.length}
+                    </span>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Completed Rescues</div>
                   </div>
                 </div>
               </div>
@@ -102,7 +130,7 @@ export default function NGODashboard() {
             </div>
           </div>
 
-          {/* Success Banner */}
+          {/* Success Notification Banner */}
           {successMessage && (
             <div style={{
               backgroundColor: '#dcfce7',
@@ -140,51 +168,74 @@ export default function NGODashboard() {
                   onClick={() => setActiveTab('in_progress')}
                 >
                   <span>🚚</span> Accepted (In Progress)
-                  <span className="tab-count-badge">{acceptedDonations.filter(d => d.status !== 'delivered').length}</span>
+                  <span className="tab-count-badge">{inProgressDonations.length}</span>
                 </button>
 
                 <button
                   className={`ngo-tab-btn ${activeTab === 'completed' ? 'active' : ''}`}
                   onClick={() => setActiveTab('completed')}
                 >
-                  <span>✅</span> Completed
-                  <span className="tab-count-badge">{acceptedDonations.filter(d => d.status === 'delivered').length || 12}</span>
+                  <span>✅</span> Completed Rescues
+                  <span className="tab-count-badge">{completedDonations.length}</span>
                 </button>
               </div>
 
-              {/* Tab 1: New Available Food Listings (Matching Reference Image 2) */}
+              {/* Tab 1: New Available Food Listings */}
               {activeTab === 'new' && (
                 <div className="listings-list">
                   {filteredListings.length === 0 ? (
                     <div className="card" style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-                      <h3>No new food listings at the moment.</h3>
-                      <p style={{ marginTop: '8px' }}>You will receive notifications as soon as local donors list meals.</p>
+                      <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🍲</div>
+                      <h3 style={{ fontSize: '1.2rem', color: '#0f172a', fontWeight: 800 }}>No Available Food Listings Currently</h3>
+                      <p style={{ marginTop: '8px', maxWidth: '420px', margin: '8px auto 0 auto', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                        There are no active food donations listed in this zone right now. When hotels and restaurants publish fresh surplus, notifications will appear here instantly!
+                      </p>
                     </div>
                   ) : (
-                    filteredListings.map((item, index) => {
-                      const distances = ['2.4 km away', '3.1 km away', '4.8 km away', '5.2 km away', '6.7 km away'];
-                      const expiryTexts = ['Expires in 4h 15m', 'Expires in 6h 20m', 'Expires in 7h 10m', 'Expires in 8h 45m', 'Expires in 9h 30m'];
-                      const typePills = ['Hot meal', 'Cooked Meal', 'Cooked Meal', 'Fresh Produce', 'Dessert'];
+                    filteredListings.map((item) => {
+                      const expired = isListingExpired(item);
+                      const distanceKm = calculateDistanceKm(
+                        item.latitude,
+                        item.longitude,
+                        currentUser?.location?.lat || 26.8920,
+                        currentUser?.location?.lng || 75.8250
+                      );
 
                       return (
                         <div key={item.id} className="listing-row-card">
                           <div className="listing-thumb-wrap">
                             <span className="listing-new-tag">New</span>
-                            <img
-                              src={item.imageURL || `/images/${(index % 6) + 1}.jpg`}
-                              alt={item.foodName}
-                              className="listing-thumb"
-                              onError={(e) => { e.target.src = '/images/1.jpg'; }}
-                            />
+                            {item.imageURL ? (
+                              <img
+                                src={item.imageURL}
+                                alt={item.foodName}
+                                className="listing-thumb"
+                              />
+                            ) : (
+                              <div className="listing-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e2e8f0', fontSize: '1.8rem' }}>
+                                🍲
+                              </div>
+                            )}
                           </div>
 
                           <div className="listing-info">
                             <div className="listing-info-top">
                               <h3 className="listing-food-name">{item.foodName}</h3>
+                              {item.listingType === 'paid' ? (
+                                <span className="badge badge-warning" style={{ fontWeight: 800 }}>
+                                  PAID &bull; ₹{item.price}/{item.unit}
+                                </span>
+                              ) : (
+                                <span className="badge badge-success" style={{ fontWeight: 800 }}>
+                                  100% FREE
+                                </span>
+                              )}
                             </div>
+
                             <div className="listing-donor-name">
-                              <span>🏨</span> {item.donorName} &bull; 📍 {distances[index % distances.length]}
+                              <span>🏨</span> {item.donorName} &bull; 📍 {distanceKm} km away
                             </div>
+
                             <div className="listing-meta-row">
                               <span className="meta-pill pill-muted">
                                 ⚖️ Quantity: {item.quantity} {item.unit}
@@ -193,27 +244,33 @@ export default function NGODashboard() {
                                 Prepared: {item.preparedAt}
                               </span>
                               <span className="meta-pill pill-fresh">
-                                Fresh &bull; 2 hours old
+                                Freshness: {item.qualityScore || 88}/100
                               </span>
                             </div>
                           </div>
 
                           <div className="listing-actions-col">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span className="meta-pill pill-expiry">
-                                ⏰ {expiryTexts[index % expiryTexts.length]}
-                              </span>
+                              {expired ? (
+                                <span className="meta-pill pill-expiry">
+                                  ⚠️ Expired
+                                </span>
+                              ) : (
+                                <span className="meta-pill pill-expiry">
+                                  ⏰ {item.pickupDeadline}
+                                </span>
+                              )}
                               <span className="meta-pill pill-category">
-                                {typePills[index % typePills.length]}
+                                {item.category}
                               </span>
                             </div>
 
                             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                               <button
                                 onClick={() => handleAcceptFood(item)}
-                                disabled={acceptingId === item.id}
+                                disabled={acceptingId === item.id || expired}
                                 className="btn btn-primary btn-sm"
-                                style={{ minWidth: '85px' }}
+                                style={{ minWidth: '85px', opacity: expired ? 0.5 : 1 }}
                               >
                                 {acceptingId === item.id ? 'Accepting...' : '✓ Accept'}
                               </button>
@@ -235,20 +292,21 @@ export default function NGODashboard() {
               {/* Tab 2: Accepted / In Progress */}
               {activeTab === 'in_progress' && (
                 <div className="listings-list">
-                  {acceptedDonations.filter(d => d.status !== 'delivered').length === 0 ? (
+                  {inProgressDonations.length === 0 ? (
                     <div className="card" style={{ textAlign: 'center', padding: '50px 20px', color: '#64748b' }}>
                       <h3>No Ongoing Distributions</h3>
-                      <p style={{ marginTop: '6px' }}>Click "Accept" on any available food listing to start a pickup.</p>
+                      <p style={{ marginTop: '6px' }}>Click "Accept" on any available food listing to start a collection.</p>
                     </div>
                   ) : (
-                    acceptedDonations.filter(d => d.status !== 'delivered').map((d) => (
+                    inProgressDonations.map((d) => (
                       <div key={d.id} className="listing-row-card">
-                        <img
-                          src={d.imageURL || '/images/1.jpg'}
-                          alt={d.foodName}
-                          className="listing-thumb"
-                          style={{ width: '80px', height: '80px' }}
-                        />
+                        <div className="listing-thumb-wrap">
+                          {d.imageURL ? (
+                            <img src={d.imageURL} alt={d.foodName} className="listing-thumb" />
+                          ) : (
+                            <div className="listing-thumb flex-center" style={{ background: '#e2e8f0', fontSize: '1.6rem' }}>🍲</div>
+                          )}
+                        </div>
                         <div className="listing-info">
                           <h3 className="listing-food-name">{d.foodName}</h3>
                           <div style={{ fontSize: '0.85rem', color: '#64748b', margin: '4px 0' }}>
@@ -256,6 +314,7 @@ export default function NGODashboard() {
                           </div>
                           <div style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 600 }}>
                             Status: {d.status.replace('_', ' ').toUpperCase()}
+                            {d.paymentMethod && ` (${d.paymentMethod === 'direct_upi' ? 'Paid via UPI' : 'Pay on Collection'})`}
                           </div>
                         </div>
                         <div className="listing-actions-col">
@@ -273,15 +332,17 @@ export default function NGODashboard() {
               {activeTab === 'completed' && (
                 <div className="card" style={{ padding: '30px', textAlign: 'center', color: '#0b462f' }}>
                   <span style={{ fontSize: '2.5rem' }}>🏆</span>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: '8px' }}>12 Completed Distributions</h3>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: '8px' }}>
+                    {completedDonations.length} Completed Food Rescues
+                  </h3>
                   <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>
-                    Thank you, Hope Foundation! You have safely delivered over 8.5 tons of surplus food to community members in need.
+                    Every completed rescue ensures meals nourish families instead of emitting methane in landfills.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Right Side Panel (Matching Reference Image 2 exactly!) */}
+            {/* Right Side Panel */}
             <div className="ngo-side-panel">
               {/* Profile Card */}
               <div className="side-panel-card">
@@ -298,27 +359,27 @@ export default function NGODashboard() {
                   </div>
                   <div>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0b462f' }}>
-                      {currentUser?.name || 'Hope Foundation'} ✓
+                      {currentUser?.organizationName || currentUser?.name || 'NGO Partner'} ✓
                     </h4>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Food for a Better Tomorrow</span>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Verified Recipient Partner</span>
                   </div>
                 </div>
 
                 <div className="side-info-list">
                   <div className="side-info-item">
-                    <span>📍</span> {currentUser?.address || 'Jaipur, Rajasthan'}
+                    <span>📍</span> {currentUser?.address || 'City Center, India'}
                   </div>
                   <div className="side-info-item">
-                    <span>📞</span> {currentUser?.phone || '+91 98765 43210'}
+                    <span>📞</span> {currentUser?.phone || '+91 98765 00000'}
                   </div>
                   <div className="side-info-item">
-                    <span>✉️</span> {currentUser?.email || 'hope.foundation@ngo.org'}
+                    <span>✉️</span> {currentUser?.email || 'contact@ngo.org'}
                   </div>
                 </div>
 
                 <div style={{ marginTop: '16px' }}>
                   <div className="sidebar-verified-tag" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
-                    ✓ Verified NGO
+                    ✓ Verified Recipient NGO
                   </div>
                 </div>
               </div>
@@ -330,58 +391,20 @@ export default function NGODashboard() {
                 </div>
                 <div className="side-stat-grid">
                   <div className="side-stat-box">
-                    <h4>12</h4>
-                    <p>Accepted Listings</p>
+                    <h4>{acceptedDonations.length}</h4>
+                    <p>Total Accepted</p>
                   </div>
                   <div className="side-stat-box">
-                    <h4>8</h4>
-                    <p>Ongoing Distributions</p>
+                    <h4>{inProgressDonations.length}</h4>
+                    <p>In Progress</p>
                   </div>
                   <div className="side-stat-box">
-                    <h4>350+</h4>
+                    <h4>{completedDonations.length}</h4>
+                    <p>Delivered</p>
+                  </div>
+                  <div className="side-stat-box">
+                    <h4>{completedDonations.length * 35 || 0}+</h4>
                     <p>People Fed</p>
-                  </div>
-                  <div className="side-stat-box">
-                    <h4>1.2 Tons</h4>
-                    <p>Food Distributed</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Activity */}
-              <div className="side-panel-card">
-                <div className="side-card-header">
-                  <h3>Recent Activity</h3>
-                  <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600 }}>View All</span>
-                </div>
-                <div className="activity-list">
-                  <div className="activity-item">
-                    <span className="activity-dot">✓</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>You accepted Veg Biryani</div>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>2 hours ago</div>
-                    </div>
-                  </div>
-                  <div className="activity-item">
-                    <span className="activity-dot">✓</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>You accepted Paneer Curry</div>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>4 hours ago</div>
-                    </div>
-                  </div>
-                  <div className="activity-item">
-                    <span className="activity-dot">✓</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>You completed distribution</div>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>1 day ago</div>
-                    </div>
-                  </div>
-                  <div className="activity-item">
-                    <span className="activity-dot" style={{ background: '#dbeafe', color: '#1d4ed8' }}>🔔</span>
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>New food listing available</div>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>1 day ago</div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -390,13 +413,13 @@ export default function NGODashboard() {
               <div style={{ background: '#e6f4ea', borderRadius: '12px', padding: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.4rem' }}>🌱</span>
                 <p style={{ fontSize: '0.8rem', color: '#0b462f', fontWeight: 600, margin: 0 }}>
-                  Small actions make a big difference.
+                  Small actions make a big difference. Together we end hunger.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* FOOD DETAILS MODAL (Section 23) */}
+          {/* FOOD DETAILS & PAYMENT MODAL */}
           {selectedFood && (
             <div style={{
               position: 'fixed',
@@ -415,14 +438,25 @@ export default function NGODashboard() {
               <div className="card" style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '28px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div>
-                    <span className="badge badge-green" style={{ marginBottom: '6px' }}>
-                      {selectedFood.category} &bull; {selectedFood.foodType}
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <span className="badge badge-green">
+                        {selectedFood.category} &bull; {selectedFood.foodType}
+                      </span>
+                      {selectedFood.listingType === 'paid' ? (
+                        <span className="badge badge-warning">
+                          PAID: ₹{selectedFood.price}/{selectedFood.unit}
+                        </span>
+                      ) : (
+                        <span className="badge badge-success">
+                          100% FREE DONATION
+                        </span>
+                      )}
+                    </div>
                     <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
                       {selectedFood.foodName}
                     </h2>
                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                      Offered by <strong>{selectedFood.donorName}</strong>
+                      Donor: <strong>{selectedFood.donorName}</strong>
                     </p>
                   </div>
                   <button onClick={() => setSelectedFood(null)} style={{ fontSize: '1.4rem', color: '#94a3b8' }}>
@@ -430,13 +464,15 @@ export default function NGODashboard() {
                   </button>
                 </div>
 
-                <div style={{ width: '100%', height: '220px', borderRadius: '12px', overflow: 'hidden', marginBottom: '18px' }}>
-                  <img
-                    src={selectedFood.imageURL || '/images/1.jpg'}
-                    alt={selectedFood.foodName}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
+                {selectedFood.imageURL && (
+                  <div style={{ width: '100%', height: '220px', borderRadius: '12px', overflow: 'hidden', marginBottom: '18px' }}>
+                    <img
+                      src={selectedFood.imageURL}
+                      alt={selectedFood.foodName}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '18px' }}>
                   <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -462,23 +498,95 @@ export default function NGODashboard() {
 
                 {/* AI Quality Section */}
                 <div style={{ marginBottom: '18px' }}>
-                  <AIQualityCard score={selectedFood.qualityScore || 88} status={selectedFood.qualityStatus} />
+                  <AIQualityCard
+                    score={selectedFood.qualityScore || 88}
+                    status={selectedFood.qualityStatus}
+                    analysis={selectedFood.qualityAnalysis}
+                  />
                 </div>
 
                 {/* Pickup Location Map Preview */}
                 <div style={{ marginBottom: '20px' }}>
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '8px' }}>
-                    📍 Pickup Location & Distance
+                    📍 Pickup Location & Navigation
                   </h4>
                   <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '8px' }}>
                     {selectedFood.pickupAddress}
                   </div>
                   <FoodConnectMap
                     donorLocation={{ lat: selectedFood.latitude || 26.8520, lng: selectedFood.longitude || 75.8050, label: selectedFood.donorName }}
-                    ngoLocation={{ lat: 26.8920, lng: 75.8250, label: currentUser?.name || 'Hope Foundation' }}
+                    ngoLocation={{ lat: currentUser?.location?.lat || 26.8920, lng: currentUser?.location?.lng || 75.8250, label: currentUser?.organizationName || 'NGO Partner' }}
                     height="200px"
                   />
                 </div>
+
+                {/* PAID LISTING SETTLEMENT WORKFLOW (User Requirement 4) */}
+                {selectedFood.listingType === 'paid' && (
+                  <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <strong style={{ fontSize: '0.95rem', color: '#92400e' }}>
+                        💳 Subsidized Food Settlement
+                      </strong>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309' }}>
+                        Total: ₹{(Number(selectedFood.price) * Number(selectedFood.quantity)).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: '0.8rem', color: '#78350f', margin: '0 0 12px 0' }}>
+                      Choose your preferred payment method for this subsidized listing:
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        background: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1.5px solid',
+                        borderColor: paymentOption === 'pickup_cash' ? '#b45309' : '#e2e8f0',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem'
+                      }}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={paymentOption === 'pickup_cash'}
+                          onChange={() => setPaymentOption('pickup_cash')}
+                        />
+                        <span>💵 Pay at Pickup (Cash / UPI)</span>
+                      </label>
+
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        background: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1.5px solid',
+                        borderColor: paymentOption === 'direct_upi' ? '#b45309' : '#e2e8f0',
+                        cursor: 'pointer',
+                        fontSize: '0.82rem'
+                      }}>
+                        <input
+                          type="radio"
+                          name="paymentOption"
+                          checked={paymentOption === 'direct_upi'}
+                          onChange={() => setPaymentOption('direct_upi')}
+                        />
+                        <span>📲 Direct UPI Instant Pay</span>
+                      </label>
+                    </div>
+
+                    {paymentOption === 'direct_upi' && (
+                      <div style={{ marginTop: '10px', background: '#fef3c7', padding: '10px', borderRadius: '6px', fontSize: '0.78rem', color: '#92400e' }}>
+                        Donor UPI ID: <strong>{selectedFood.donorName.toLowerCase().replace(/[^a-z]/g, '')}@upi</strong> &bull; Simulated transaction authorization will be generated on acceptance.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Modal Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
@@ -490,7 +598,7 @@ export default function NGODashboard() {
                     className="btn btn-primary"
                     style={{ minWidth: '160px' }}
                   >
-                    🤝 Accept Donation
+                    {selectedFood.listingType === 'paid' ? '🤝 Confirm & Settle' : '🤝 Accept Donation'}
                   </button>
                 </div>
               </div>
