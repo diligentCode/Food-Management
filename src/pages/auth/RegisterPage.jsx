@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { MAJOR_CITIES_COORDINATES } from '../../services/dataService';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -13,10 +14,50 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [selectedCityKey, setSelectedCityKey] = useState('jaipur');
   const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState(MAJOR_CITIES_COORDINATES.jaipur.lat);
+  const [longitude, setLongitude] = useState(MAJOR_CITIES_COORDINATES.jaipur.lng);
+  const [gpsStatus, setGpsStatus] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const handleCityChange = (cityKey) => {
+    setSelectedCityKey(cityKey);
+    const cityData = MAJOR_CITIES_COORDINATES[cityKey];
+    if (cityData) {
+      setLatitude(cityData.lat);
+      setLongitude(cityData.lng);
+      setGpsStatus(`📍 Center coordinates selected for ${cityData.name}`);
+    }
+  };
+
+  const handleDetectGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsLoading(true);
+    setGpsStatus('Detecting live satellite/GPS coordinates...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(5));
+        const lng = Number(pos.coords.longitude.toFixed(5));
+        setLatitude(lat);
+        setLongitude(lng);
+        setGpsLoading(false);
+        setGpsStatus(`✓ Exact GPS Captured: ${lat}, ${lng}`);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        setGpsLoading(false);
+        setGpsStatus(`⚠️ Could not detect GPS (${err.message}). Using ${MAJOR_CITIES_COORDINATES[selectedCityKey]?.name || 'City'} coordinates.`);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,12 +70,15 @@ export default function RegisterPage() {
 
     try {
       setSubmitting(true);
+      const chosenCity = MAJOR_CITIES_COORDINATES[selectedCityKey]?.name || 'Jaipur';
       const user = await register({
         name: name || organizationName,
         organizationName,
         email,
         phone,
-        address,
+        city: chosenCity,
+        address: address ? `${address}, ${chosenCity}` : chosenCity,
+        location: { lat: latitude, lng: longitude },
         role
       });
 
@@ -160,17 +204,55 @@ export default function RegisterPage() {
             />
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
+                Operational City *
+              </label>
+              <select
+                value={selectedCityKey}
+                onChange={(e) => handleCityChange(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', outline: 'none', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
+              >
+                {Object.entries(MAJOR_CITIES_COORDINATES).map(([key, city]) => (
+                  <option key={key} value={key}>{city.name} ({city.state})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
+                GPS Pinning
+              </label>
+              <button
+                type="button"
+                onClick={handleDetectGPS}
+                disabled={gpsLoading}
+                className="btn btn-secondary"
+                style={{ width: '100%', padding: '10px 12px', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                {gpsLoading ? 'Detecting...' : '📍 Detect Live GPS'}
+              </button>
+            </div>
+          </div>
+
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-main)', marginBottom: '5px' }}>
-              Address / Location
+              Street Address & Landmark *
             </label>
             <input
               type="text"
+              required
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="City, State (e.g. Tonk Road, Jaipur)"
+              placeholder={role === 'donor' ? 'e.g. Tonk Road, Service Gate 2' : 'e.g. Sector 4, Community Kitchen Shelter'}
               style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', outline: 'none', fontSize: '0.9rem' }}
             />
+            {gpsStatus && (
+              <p style={{ fontSize: '0.75rem', color: gpsStatus.startsWith('✓') ? '#15803d' : '#b45309', marginTop: '4px', fontWeight: 600 }}>
+                {gpsStatus}
+              </p>
+            )}
           </div>
 
           <div>

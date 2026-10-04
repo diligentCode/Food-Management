@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage() {
-  const { login, quickTestLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -31,13 +31,6 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleQuickLogin = (role) => {
-    const user = quickTestLogin(role);
-    if (user.role === 'donor') navigate('/donor');
-    else if (user.role === 'ngo') navigate('/ngo');
-    else if (user.role === 'admin') navigate('/admin');
   };
 
   return (
@@ -93,36 +86,6 @@ export default function LoginPage() {
             {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        {/* 1-Click Quick Demo Access */}
-        <div style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid var(--color-border)' }}>
-          <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '10px' }}>
-            ⚡ 1-CLICK DEMO ACCESS:
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <button
-              onClick={() => handleQuickLogin('donor')}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.8rem' }}
-            >
-              🏨 Hotel Green Valley (Donor)
-            </button>
-            <button
-              onClick={() => handleQuickLogin('ngo')}
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.8rem' }}
-            >
-              🤝 Hope Foundation (NGO)
-            </button>
-          </div>
-          <button
-            onClick={() => handleQuickLogin('admin')}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.8rem', width: '100%', marginTop: '6px' }}
-          >
-            🛡️ Central Admin Dashboard
-          </button>
-        </div>
 
         <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
           Don't have an account?{' '}

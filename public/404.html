@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>FoodConnect — Redirecting</title>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      // MIT License - https://github.com/rafgraph/spa-github-pages
+      // Handles 404s when navigating directly to routes like /donor, /ngo, etc.
+      var pathSegmentsToKeep = 0;
+      var l = window.location;
+      // If hosted in a repository subpath (e.g., username.github.io/repo-name), detect segments
+      if (l.pathname.split('/').length > 2 && l.hostname.includes('github.io')) {
+        pathSegmentsToKeep = 1;
+      }
+
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body>
+    <p style="text-align:center; padding: 40px; font-family: sans-serif;">Loading FoodConnect...</p>
+  </body>
+</html>

@@ -20,6 +20,9 @@ export default function AddFoodPage() {
   const [preparedAt, setPreparedAt] = useState('Today, 11:30 AM');
   const [expiryHours, setExpiryHours] = useState('6');
   const [pickupAddress, setPickupAddress] = useState(currentUser?.address || 'Hotel Kitchen Dispatch Gate');
+  const [pickupLat, setPickupLat] = useState(currentUser?.location?.lat || 26.8520);
+  const [pickupLng, setPickupLng] = useState(currentUser?.location?.lng || 75.8050);
+  const [gpsPinStatus, setGpsPinStatus] = useState('');
   const [listingType, setListingType] = useState('free'); // 'free' | 'paid'
   const [price, setPrice] = useState(40);
   const [imageURL, setImageURL] = useState('');
@@ -28,6 +31,28 @@ export default function AddFoodPage() {
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const handleDetectPickupGPS = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGpsPinStatus('Acquiring live kitchen gate coordinates...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(5));
+        const lng = Number(pos.coords.longitude.toFixed(5));
+        setPickupLat(lat);
+        setPickupLng(lng);
+        setGpsPinStatus(`✓ Exact GPS Pinned: ${lat}, ${lng}`);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err);
+        setGpsPinStatus(`⚠️ Geolocation error: ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
 
   // Run AI Analysis whenever image or category changes
   const runAiAnalysis = async (imgData, cat, name) => {
@@ -97,8 +122,9 @@ export default function AddFoodPage() {
         expiresAt,
         imageURL: imageURL || '',
         pickupAddress,
-        latitude: currentUser?.location?.lat || 26.8520,
-        longitude: currentUser?.location?.lng || 75.8050,
+        latitude: pickupLat,
+        longitude: pickupLng,
+        city: currentUser?.city || 'Jaipur',
         listingType,
         price: listingType === 'paid' ? Number(price) : 0,
         qualityScore: aiScore,
@@ -259,9 +285,19 @@ export default function AddFoodPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
-                  Pickup Address & Gate Landmark
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 700, margin: 0 }}>
+                    Pickup Address & Gate Landmark *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleDetectPickupGPS}
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                  >
+                    📍 Pin My Current GPS
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
@@ -270,6 +306,14 @@ export default function AddFoodPage() {
                   placeholder="e.g. Hotel Service Gate, Loading Bay 1"
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.92rem' }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '0.72rem', color: '#64748b' }}>
+                  <span>GPS Coordinates: {pickupLat}, {pickupLng}</span>
+                  {gpsPinStatus && (
+                    <span style={{ color: gpsPinStatus.startsWith('✓') ? '#15803d' : '#b45309', fontWeight: 600 }}>
+                      {gpsPinStatus}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Free vs Paid Low-Cost Listing (Section 18 & User Requirement 4) */}

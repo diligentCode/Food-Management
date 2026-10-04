@@ -81,8 +81,18 @@ export default function NGOMapPage() {
                   </div>
 
                   <FoodConnectMap
-                    donorLocation={{ lat: selectedFood.latitude || 26.8520, lng: selectedFood.longitude || 75.8050, label: selectedFood.donorName }}
-                    ngoLocation={{ lat: 26.8920, lng: 75.8250, label: currentUser?.name || 'Hope Foundation' }}
+                    donorLocation={{
+                      lat: selectedFood.latitude || 26.8520,
+                      lng: selectedFood.longitude || 75.8050,
+                      label: selectedFood.donorName,
+                      address: selectedFood.pickupAddress
+                    }}
+                    ngoLocation={{
+                      lat: currentUser?.location?.lat || 26.8920,
+                      lng: currentUser?.location?.lng || 75.8250,
+                      label: currentUser?.organizationName || currentUser?.name || 'NGO Partner',
+                      address: currentUser?.address || 'NGO Headquarters'
+                    }}
                     height="420px"
                   />
                 </div>

@@ -1,41 +1,100 @@
 // ===================================================================
-// FOODCONNECT - FIREBASE CONFIGURATION
-// Connects to Firebase if environment variables are provided,
-// and gracefully falls back to persistent storage for easy local testing.
+// FOODCONNECT - FIREBASE CLOUD CONFIGURATION & REAL-TIME SYNC
+// Connects to Firebase Authentication & Cloud Firestore for real
+// multi-device synchronization across different phones and computers.
+// Supports both .env variables and in-app Firebase configuration.
 // ===================================================================
 
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot 
+} from 'firebase/firestore';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD-mock-foodconnect-demo-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "foodconnect-demo.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "foodconnect-demo",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "foodconnect-demo.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1234567890",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1234567890:web:abcdef123456"
-};
+const STORAGE_CUSTOM_FIREBASE_KEY = 'foodconnect_custom_firebase_config';
 
-// Check if actual Firebase project credentials are configured
-export const isLiveFirebaseConfigured = Boolean(
-  import.meta.env.VITE_FIREBASE_API_KEY && 
-  import.meta.env.VITE_FIREBASE_PROJECT_ID
-);
+export function getStoredFirebaseConfig() {
+  try {
+    const custom = localStorage.getItem(STORAGE_CUSTOM_FIREBASE_KEY);
+    if (custom) return JSON.parse(custom);
+  } catch (e) {
+    console.warn('Could not parse stored Firebase config:', e);
+  }
+
+  // Fallback to environment variables
+  return {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+  };
+}
+
+export function saveStoredFirebaseConfig(config) {
+  try {
+    localStorage.setItem(STORAGE_CUSTOM_FIREBASE_KEY, JSON.stringify(config));
+    window.location.reload();
+  } catch (e) {
+    console.error('Failed to save Firebase config:', e);
+  }
+}
+
+export function isCloudFirebaseActive() {
+  const cfg = getStoredFirebaseConfig();
+  return Boolean(cfg.apiKey && cfg.projectId && cfg.apiKey.length > 10);
+}
 
 let app = null;
 let auth = null;
 let db = null;
-let storage = null;
 
-try {
-  app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
-} catch (error) {
-  console.warn("Firebase initialization warning (using local fallback service):", error);
+const currentConfig = getStoredFirebaseConfig();
+
+if (isCloudFirebaseActive()) {
+  try {
+    app = !getApps().length ? initializeApp(currentConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+    console.log('✅ FoodConnect: Connected to Cloud Firestore & Firebase Auth for multi-device sync.');
+  } catch (err) {
+    console.warn('Firebase initialization error:', err);
+  }
 }
 
-export { app, auth, db, storage };
+export { 
+  app, 
+  auth, 
+  db, 
+  // Auth methods
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  // Firestore methods
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot 
+};

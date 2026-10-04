@@ -1,9 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { notificationService, messageService } from '../../services/dataService';
 
 export default function Sidebar() {
   const { currentUser, userRole, logout } = useAuth();
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+
+  const updateCounts = () => {
+    if (currentUser?.id) {
+      setUnreadNotifs(notificationService.getUnreadCount(currentUser.id));
+      setUnreadMsgs(messageService.getUnreadCount(currentUser.id));
+    }
+  };
+
+  useEffect(() => {
+    updateCounts();
+    const interval = setInterval(updateCounts, 2500);
+
+    const handleUpdate = () => updateCounts();
+    window.addEventListener('foodconnect_data_updated', handleUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('foodconnect_data_updated', handleUpdate);
+    };
+  }, [currentUser]);
 
   return (
     <aside className="sidebar">
@@ -20,17 +43,17 @@ export default function Sidebar() {
         </div>
       </Link>
 
-      {/* User Card if NGO (Matching Reference Image 2) */}
+      {/* User Card if NGO */}
       {userRole === 'ngo' && (
         <div className="sidebar-user-card">
           <div className="sidebar-user-avatar" style={{ background: '#126343', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#fff' }}>
             🤝
           </div>
           <div className="sidebar-user-info">
-            <h4>{currentUser?.name || 'Hope Foundation'} ✓</h4>
-            <span>NGO / Receiver</span>
+            <h4>{currentUser?.organizationName || currentUser?.name || 'NGO Partner'}</h4>
+            <span>Verified Recipient NGO</span>
             <div className="sidebar-verified-tag">
-              ✓ Verified NGO
+              ✓ Verified Partner
             </div>
           </div>
         </div>
@@ -43,7 +66,7 @@ export default function Sidebar() {
             <li className="sidebar-item">
               <NavLink to="/donor" end className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">🏠</span>
-                <span>Home</span>
+                <span>Home Dashboard</span>
               </NavLink>
             </li>
             <li className="sidebar-item">
@@ -74,13 +97,13 @@ export default function Sidebar() {
               <NavLink to="/donor/messages" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">💬</span>
                 <span>Chat & Messages</span>
-                <span className="sidebar-badge">2</span>
+                {unreadMsgs > 0 && <span className="sidebar-badge">{unreadMsgs}</span>}
               </NavLink>
             </li>
             <li className="sidebar-item">
               <NavLink to="/donor/profile" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">👤</span>
-                <span>Profile</span>
+                <span>Profile & Location</span>
               </NavLink>
             </li>
           </>
@@ -92,7 +115,7 @@ export default function Sidebar() {
               <NavLink to="/ngo" end className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">🔔</span>
                 <span>Food Notifications</span>
-                <span className="sidebar-badge">5</span>
+                {unreadNotifs > 0 && <span className="sidebar-badge">{unreadNotifs}</span>}
               </NavLink>
             </li>
             <li className="sidebar-item">
@@ -110,20 +133,20 @@ export default function Sidebar() {
             <li className="sidebar-item">
               <NavLink to="/ngo/map" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">🗺️</span>
-                <span>Map View</span>
+                <span>Live Route Map</span>
               </NavLink>
             </li>
             <li className="sidebar-item">
               <NavLink to="/ngo/messages" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">💬</span>
                 <span>Chat & Messages</span>
-                <span className="sidebar-badge">2</span>
+                {unreadMsgs > 0 && <span className="sidebar-badge">{unreadMsgs}</span>}
               </NavLink>
             </li>
             <li className="sidebar-item">
               <NavLink to="/ngo/profile" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">🏢</span>
-                <span>NGO Profile</span>
+                <span>NGO Profile & Location</span>
               </NavLink>
             </li>
           </>

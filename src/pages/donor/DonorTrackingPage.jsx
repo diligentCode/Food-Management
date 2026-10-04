@@ -106,13 +106,23 @@ export default function DonorTrackingPage() {
                       Pickup & Delivery Route Map
                     </h3>
                     <FoodConnectMap
-                      donorLocation={{ lat: 26.8520, lng: 75.8050, label: selectedDonation.donorName }}
-                      ngoLocation={{ lat: 26.8920, lng: 75.8250, label: selectedDonation.ngoName }}
+                      donorLocation={{
+                        lat: selectedDonation.pickupLatitude || selectedDonation.latitude || 26.8520,
+                        lng: selectedDonation.pickupLongitude || selectedDonation.longitude || 75.8050,
+                        label: selectedDonation.donorName,
+                        address: selectedDonation.pickupAddress
+                      }}
+                      ngoLocation={{
+                        lat: selectedDonation.dropLatitude || 26.8920,
+                        lng: selectedDonation.dropLongitude || 75.8250,
+                        label: selectedDonation.ngoName,
+                        address: selectedDonation.dropAddress || 'NGO Distribution Center'
+                      }}
                       height="320px"
                     />
-                    <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#64748b' }}>
+                    <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '0.82rem', color: '#64748b' }}>
                       <span>📍 Pickup Point: <strong>{selectedDonation.pickupAddress}</strong></span>
-                      <span>Target Recipient: <strong>{selectedDonation.ngoName}</strong></span>
+                      <span>Target Recipient: <strong>{selectedDonation.ngoName}</strong> ({selectedDonation.dropAddress || 'NGO Facility'})</span>
                     </div>
                   </div>
                 </div>

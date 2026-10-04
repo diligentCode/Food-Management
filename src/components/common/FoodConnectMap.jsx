@@ -2,9 +2,9 @@ import React from 'react';
 import { calculateDistanceKm } from '../../services/dataService';
 
 export default function FoodConnectMap({
-  donorLocation = { lat: 26.8520, lng: 75.8050, label: 'Hotel Green Valley' },
-  ngoLocation = { lat: 26.8920, lng: 75.8250, label: 'Hope Foundation' },
-  pickupLocation = { lat: 26.8520, lng: 75.8050, label: 'Tonk Road Kitchen' },
+  donorLocation = { lat: 26.8520, lng: 75.8050, label: 'Hotel Green Valley', address: 'Tonk Road' },
+  ngoLocation = { lat: 26.8920, lng: 75.8250, label: 'Hope Foundation', address: 'Distribution Center' },
+  pickupLocation = null,
   height = '320px',
   showRoute = true
 }) {
@@ -15,7 +15,8 @@ export default function FoodConnectMap({
     ngoLocation.lng
   );
 
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${ngoLocation.lat},${ngoLocation.lng}&destination=${donorLocation.lat},${donorLocation.lng}`;
+  const estMinutes = Math.max(5, Math.round(distanceKm * 2.5));
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${donorLocation.lat},${donorLocation.lng}&destination=${ngoLocation.lat},${ngoLocation.lng}`;
 
   return (
     <div style={{
@@ -95,10 +96,10 @@ export default function FoodConnectMap({
         <span style={{ fontSize: '1.2rem' }}>📍</span>
         <div>
           <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
-            Approx. {distanceKm} km away
+            Approx. {distanceKm} km transit distance
           </div>
           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-            Estimated travel: ~12-15 mins
+            Estimated vehicle transit: ~{estMinutes} mins
           </div>
         </div>
       </div>

@@ -2,71 +2,97 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { wasteService, foodService } from '../../services/dataService';
+import { wasteService, foodService, getMunicipalContactForCity, MUNICIPAL_CORPORATIONS_DIRECTORY } from '../../services/dataService';
 
 export default function WasteManagementPage() {
   const { currentUser } = useAuth();
   const [requests, setRequests] = useState([]);
-  const [expiredListings, setExpiredListings] = useState([]);
-  
-  // Form State
-  const [foodName, setFoodName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [spoilageReason, setSpoilageReason] = useState('Expired past safe consumption window');
-  const [regionWard, setRegionWard] = useState('Zone 1 - Central Urban Municipal Ward');
-  const [address, setAddress] = useState(currentUser?.address || 'Hotel Kitchen Loading Dock');
-  const [preferredSlot, setPreferredSlot] = useState('Morning Slot (08:00 AM - 11:00 AM)');
-  const [linkedListingId, setLinkedListingId] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [donorListings, setDonorListings] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(currentUser?.city || 'Jaipur');
+  const [submittingId, setSubmittingId] = useState(null);
   const [successTicket, setSuccessTicket] = useState(null);
+  const [showManualForm, setShowManualForm] = useState(false);
+
+  // Manual fallback form state (only for unlisted kitchen trimmings)
+  const [manualFoodName, setManualFoodName] = useState('');
+  const [manualQuantity, setManualQuantity] = useState('');
+  const [manualReason, setManualReason] = useState('Kitchen vegetable trimmings & pre-cooking organic waste');
 
   const loadData = () => {
     if (currentUser) {
       setRequests(wasteService.getDonorRequests(currentUser.id));
-      const donorListings = foodService.getDonorListings(currentUser.id);
-      setExpiredListings(donorListings.filter(l => l.status === 'expired' || l.status === 'waste_collection_requested'));
+      const listings = foodService.getDonorListings(currentUser.id);
+      setDonorListings(listings);
     }
   };
 
   useEffect(() => {
     loadData();
+    if (currentUser?.city) setSelectedCity(currentUser.city);
   }, [currentUser]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!foodName || !quantity) return;
+  // Real official municipal contact for the user's city
+  const municipalContact = getMunicipalContactForCity(selectedCity);
 
-    setSubmitting(true);
+  // 1-Click: Turn existing listing into Municipal Waste Ticket (No form re-filling)
+  const handleRequestForListing = (listing) => {
+    try {
+      setSubmittingId(listing.id);
+      const isExpired = listing.status === 'expired';
+      const reason = isExpired 
+        ? 'Surplus expired past safe edible consumption window'
+        : 'Leftover surplus marked for circular organic biomethanation/composting';
+
+      const newTicket = wasteService.createWasteRequest({
+        donorId: currentUser?.id,
+        donorName: currentUser?.organizationName || currentUser?.name,
+        foodListingId: listing.id,
+        foodName: listing.foodName,
+        quantity: `${listing.quantity} ${listing.unit}`,
+        spoilageReason: reason,
+        regionWard: `${selectedCity} Municipal Solid Waste Zone`,
+        address: listing.pickupAddress || currentUser?.address || `${selectedCity} Service Gate`,
+        preferredSlot: 'Next Scheduled Municipal Eco-Truck Run (10:00 AM - 01:00 PM)'
+      });
+
+      // Update listing status so it is no longer available for donation
+      foodService.updateListing(listing.id, { status: 'waste_collection_requested' });
+
+      setSuccessTicket(newTicket);
+      loadData();
+    } catch (err) {
+      alert('Error scheduling municipal waste pickup: ' + err.message);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  // Submit manual scrap form
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (!manualFoodName || !manualQuantity) return;
+
     try {
       const newTicket = wasteService.createWasteRequest({
         donorId: currentUser?.id,
         donorName: currentUser?.organizationName || currentUser?.name,
-        foodListingId: linkedListingId || null,
-        foodName,
-        quantity: `${quantity} kg`,
-        spoilageReason,
-        regionWard,
-        address,
-        preferredSlot
+        foodListingId: null,
+        foodName: manualFoodName,
+        quantity: `${manualQuantity} kg`,
+        spoilageReason: manualReason,
+        regionWard: `${selectedCity} Municipal Solid Waste Zone`,
+        address: currentUser?.address || `${selectedCity} Kitchen Gate`,
+        preferredSlot: 'Next Scheduled Municipal Eco-Truck Run (10:00 AM - 01:00 PM)'
       });
 
       setSuccessTicket(newTicket);
-      setFoodName('');
-      setQuantity('');
-      setLinkedListingId('');
+      setManualFoodName('');
+      setManualQuantity('');
+      setShowManualForm(false);
       loadData();
     } catch (err) {
-      alert('Error creating waste collection request: ' + err.message);
-    } finally {
-      setSubmitting(false);
+      alert('Error scheduling request: ' + err.message);
     }
-  };
-
-  const handleSelectExpiredListing = (listing) => {
-    setFoodName(listing.foodName);
-    setQuantity(listing.quantity);
-    setLinkedListingId(listing.id);
-    setAddress(listing.pickupAddress);
   };
 
   return (
@@ -75,20 +101,23 @@ export default function WasteManagementPage() {
       <div className="dashboard-main">
         <AppNavbar title="Municipal Waste & Composting Portal" />
 
-        <div className="dashboard-body" style={{ maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+        <div className="dashboard-body" style={{ maxWidth: '1080px', margin: '0 auto', width: '100%' }}>
+          {/* Header */}
           <div style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '1.8rem' }}>♻️</span>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
-                Municipal Waste & Composting Collection
-              </h1>
+              <span style={{ fontSize: '2rem' }}>♻️</span>
+              <div>
+                <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
+                  Municipal Organic Waste & Composting
+                </h1>
+                <p style={{ color: 'var(--color-text-muted)', fontSize: '0.92rem', marginTop: '4px' }}>
+                  Convert expired, spoiled, or non-consumable food into green biogas & agricultural compost via your city's official Municipal Corporation.
+                </p>
+              </div>
             </div>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', marginTop: '6px' }}>
-              Responsible circular disposal: Request Municipal Corporation organic waste collection for expired or non-consumable food to be converted into green biogas and agricultural compost.
-            </p>
           </div>
 
-          {/* Success Notification */}
+          {/* Success Banner */}
           {successTicket && (
             <div style={{
               backgroundColor: '#ecfdf5',
@@ -101,14 +130,14 @@ export default function WasteManagementPage() {
               justifyContent: 'space-between'
             }}>
               <div>
-                <strong style={{ fontSize: '1rem', color: '#065f46' }}>
-                  ✓ Municipal Collection Scheduled Successfully!
+                <strong style={{ fontSize: '1.05rem', color: '#065f46' }}>
+                  ✓ Municipal Collection Ticket Generated: {successTicket.ticketNumber}
                 </strong>
                 <div style={{ fontSize: '0.85rem', color: '#047857', marginTop: '4px' }}>
-                  Ticket Number: <strong>{successTicket.ticketNumber}</strong> &bull; Scheduled Slot: {successTicket.preferredSlot}
+                  Food Batch: <strong>{successTicket.foodName}</strong> ({successTicket.quantity}) &bull; Scheduled: {successTicket.preferredSlot}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#0f766e', marginTop: '2px' }}>
-                  Destination: {successTicket.wasteDestination}
+                  Routing to: <strong>{successTicket.wasteDestination}</strong>
                 </div>
               </div>
               <button onClick={() => setSuccessTicket(null)} className="btn btn-secondary btn-sm">
@@ -117,182 +146,226 @@ export default function WasteManagementPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '28px', marginBottom: '32px' }}>
-            {/* Left: Request Form */}
-            <div className="card" style={{ padding: '28px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '16px' }}>
-                Request Municipal Collection Ticket
-              </h3>
-
-              {expiredListings.length > 0 && (
-                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
-                    Quick Select From Your Expired Postings:
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
-                    {expiredListings.map(l => (
-                      <button
-                        key={l.id}
-                        type="button"
-                        onClick={() => handleSelectExpiredListing(l)}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
-                          background: linkedListingId === l.id ? '#0b462f' : '#ffffff',
-                          color: linkedListingId === l.id ? '#ffffff' : '#334155',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {l.foodName} ({l.quantity} {l.unit})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                    Food / Organic Waste Item *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={foodName}
-                    onChange={(e) => setFoodName(e.target.value)}
-                    placeholder="e.g. Expired Curry & Rice Batch"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                      Weight / Quantity (kg) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      placeholder="e.g. 20"
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                      Municipal Zone / Ward
-                    </label>
-                    <select
-                      value={regionWard}
-                      onChange={(e) => setRegionWard(e.target.value)}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem' }}
-                    >
-                      <option value="Zone 1 - Central Urban Ward">Zone 1 - Central Urban Ward</option>
-                      <option value="Zone 2 - North Commercial Sector">Zone 2 - North Commercial Sector</option>
-                      <option value="Zone 3 - South Industrial & Hotel Belt">Zone 3 - South Industrial & Hotel Belt</option>
-                      <option value="Zone 4 - Western Suburban District">Zone 4 - Western Suburban District</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                    Reason for Municipal Disposal
-                  </label>
-                  <select
-                    value={spoilageReason}
-                    onChange={(e) => setSpoilageReason(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem' }}
-                  >
-                    <option value="Expired past safe consumption window">Expired past safe consumption window</option>
-                    <option value="Cold chain breakdown / Temp variance">Cold chain breakdown / Temp variance</option>
-                    <option value="Packaging breach / Unsealed batch">Packaging breach / Unsealed batch</option>
-                    <option value="Preparation surplus not collected">Preparation surplus not collected</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                    Pickup Location Address
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. Hotel Service Gate, Loading Dock 2"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.9rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '4px' }}>
-                    Preferred Municipal Truck Slot
-                  </label>
-                  <select
-                    value={preferredSlot}
-                    onChange={(e) => setPreferredSlot(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem' }}
-                  >
-                    <option value="Morning Slot (08:00 AM - 11:00 AM)">Morning Slot (08:00 AM - 11:00 AM)</option>
-                    <option value="Afternoon Slot (02:00 PM - 05:00 PM)">Afternoon Slot (02:00 PM - 05:00 PM)</option>
-                    <option value="Night Eco-Run (10:00 PM - 01:00 AM)">Night Eco-Run (10:00 PM - 01:00 AM)</option>
-                  </select>
-                </div>
-
-                <button type="submit" disabled={submitting} className="btn btn-primary" style={{ marginTop: '10px' }}>
-                  {submitting ? 'Generating Ticket...' : '🚚 Submit Municipal Waste Request'}
-                </button>
-              </form>
-            </div>
-
-            {/* Right: Informational Guidelines */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="card" style={{ background: '#f8fafc', padding: '24px' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '12px' }}>
-                  🌱 Zero-Landfill Protocol
-                </h4>
-                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem', color: '#475569', padding: 0 }}>
-                  <li style={{ display: 'flex', gap: '8px' }}>
-                    <span>✅</span>
-                    <span><strong>100% Diverted from Landfills:</strong> All collected organic waste is routed to regional composting or biomethanation plants.</span>
-                  </li>
-                  <li style={{ display: 'flex', gap: '8px' }}>
-                    <span>✅</span>
-                    <span><strong>Segregation:</strong> Ensure food waste is free from plastic cutlery, wraps, or aluminum foil prior to truck arrival.</span>
-                  </li>
-                  <li style={{ display: 'flex', gap: '8px' }}>
-                    <span>✅</span>
-                    <span><strong>Digital Proof:</strong> Each completed ticket provides a green certificate for your hotel's sustainability records.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="card" style={{ padding: '20px', borderLeft: '4px solid #10b981' }}>
-                <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                  Municipal Contact Helpline
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
-                  Toll-Free Swachh Bharat Waste Helpline: <strong>1800-180-2026</strong>
+          {/* SECTION 1: REAL OFFICIAL MUNICIPAL CORPORATION CONTACT CARD */}
+          <div className="card" style={{ padding: '24px', marginBottom: '28px', borderLeft: '5px solid #10b981', backgroundColor: '#fcfdfd' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <span className="badge badge-success" style={{ marginBottom: '6px' }}>
+                  🏛️ Verified Official Authority
+                </span>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: '4px 0' }}>
+                  {municipalContact.name}
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+                  Department: <strong>{municipalContact.wasteDepartment}</strong>
                 </p>
               </div>
+
+              {/* City Switcher */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Municipal Region:</span>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#ffffff', fontWeight: 600 }}
+                >
+                  <option value="Jaipur">Jaipur (Nagar Nigam)</option>
+                  <option value="New Delhi">New Delhi (MCD)</option>
+                  <option value="Mumbai">Mumbai (BMC)</option>
+                  <option value="Bengaluru">Bengaluru (BBMP)</option>
+                  <option value="Hyderabad">Hyderabad (GHMC)</option>
+                  <option value="Chennai">Chennai (GCC)</option>
+                  <option value="Pune">Pune (PMC)</option>
+                  <option value="Ahmedabad">Ahmedabad (AMC)</option>
+                  <option value="Kolkata">Kolkata (KMC)</option>
+                  <option value="Lucknow">Lucknow (LMC)</option>
+                  <option value="Chandigarh">Chandigarh (MCC)</option>
+                  <option value="National">National (Swachh Bharat 1969)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Processing Facility Info */}
+            <div style={{ background: '#f1f5f9', padding: '12px 16px', borderRadius: '8px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '1.5rem' }}>🏭</span>
+              <div>
+                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Regional Bio-Methanation & Composting Plant:</strong>
+                <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                  {municipalContact.centralFacility}
+                </div>
+              </div>
+            </div>
+
+            {/* Direct Real Contact Actions */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+              <a
+                href={`tel:${municipalContact.phoneClean || municipalContact.helpline}`}
+                className="btn btn-primary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                <span>📞</span> Call Municipal Helpline ({municipalContact.helpline})
+              </a>
+
+              <a
+                href={`mailto:${municipalContact.email}?subject=FoodConnect Organic Surplus Food Waste Pickup Request - ${currentUser?.organizationName || 'Hotel'}&body=Dear ${municipalContact.name} Solid Waste Management Department,%0D%0A%0D%0AWe are registered with FoodConnect (${currentUser?.organizationName || 'Hotel'}) located at ${currentUser?.address || selectedCity}.%0D%0A%0D%0AWe request organic waste pickup for our surplus edible food batch that has exceeded its consumption window, to ensure 100% diversion from landfills to bio-methanation/composting.%0D%0A%0D%0APickup Location: ${currentUser?.address || selectedCity}%0D%0AContact Phone: ${currentUser?.phone || ''}%0D%0A%0D%0AThank you.`}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                <span>📧</span> Send Official Email ({municipalContact.email})
+              </a>
+
+              <a
+                href={municipalContact.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+              >
+                <span>🌐</span> Official Portal ({municipalContact.website.replace('https://', '')})
+              </a>
             </div>
           </div>
 
-          {/* Submitted Tickets Table */}
+          {/* SECTION 2: 1-CLICK MUNICIPAL PICKUP FOR EXISTING LISTED FOOD ITEMS */}
+          <div className="card" style={{ padding: '24px', marginBottom: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
+                  Your Listed Food Batches ({donorListings.length})
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
+                  No need to re-type details. 1-click schedule municipal waste collection for any expired or leftover posting using existing data:
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowManualForm(!showManualForm)}
+                className="btn btn-secondary btn-sm"
+              >
+                {showManualForm ? '✕ Close Custom Form' : '➕ Log Unlisted Kitchen Scrap'}
+              </button>
+            </div>
+
+            {/* Optional Unlisted Kitchen Scrap Drawer */}
+            {showManualForm && (
+              <form onSubmit={handleManualSubmit} style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #cbd5e1', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                  Log Unlisted Raw Kitchen Scrap (Peels, prep trims, plate waste)
+                </strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Raw Vegetable Trimmings & Kitchen Peels"
+                    value={manualFoodName}
+                    onChange={(e) => setManualFoodName(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    placeholder="Weight in kg (e.g. 15)"
+                    value={manualQuantity}
+                    onChange={(e) => setManualQuantity(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }}>
+                  Schedule Municipal Collection for Scrap &rarr;
+                </button>
+              </form>
+            )}
+
+            {donorListings.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 20px', color: '#64748b' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🍲</div>
+                <strong style={{ color: '#0f172a' }}>No Food Listings Created Yet</strong>
+                <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
+                  When you create food listings in "List Surplus Food", any batches that expire or require bio-waste diversion can be sent for municipal pickup directly from here.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {donorListings.map((item) => {
+                  const isWasteTicketed = item.status === 'waste_collection_requested';
+                  const isExpired = item.status === 'expired';
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '16px 20px',
+                        borderRadius: '12px',
+                        border: '1.5px solid',
+                        borderColor: isWasteTicketed ? '#10b981' : isExpired ? '#fca5a5' : '#e2e8f0',
+                        backgroundColor: isWasteTicketed ? '#f0fdf4' : isExpired ? '#fff5f5' : '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: isExpired ? '#fee2e2' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', flexShrink: 0 }}>
+                          {isExpired ? '⚠️' : '🍲'}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ fontSize: '0.98rem', color: '#0f172a' }}>{item.foodName}</strong>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              backgroundColor: isWasteTicketed ? '#dcfce7' : isExpired ? '#fee2e2' : '#e2e8f0',
+                              color: isWasteTicketed ? '#15803d' : isExpired ? '#b91c1c' : '#475569'
+                            }}>
+                              {isWasteTicketed ? 'WASTE PICKUP SCHEDULED' : isExpired ? 'EXPIRED' : item.status.toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
+                            Quantity: <strong>{item.quantity} {item.unit}</strong> &bull; Category: {item.category} &bull; Pickup: {item.pickupAddress}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        {isWasteTicketed ? (
+                          <span style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: 700 }}>
+                            ✓ Municipal Truck Assigned
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleRequestForListing(item)}
+                            disabled={submittingId === item.id}
+                            className="btn btn-primary btn-sm"
+                            style={{ backgroundColor: '#0b462f', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                          >
+                            <span>♻️</span>
+                            <span>{submittingId === item.id ? 'Scheduling...' : 'Send to Municipal Waste Pickup'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 3: MUNICIPAL COLLECTION TICKETS HISTORY */}
           <div className="card" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '16px' }}>
-              Your Waste Collection Tickets ({requests.length})
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-primary-dark)', marginBottom: '16px' }}>
+              Your Municipal Collection Tickets ({requests.length})
             </h3>
 
             {requests.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', padding: '24px 0' }}>
-                No waste collection requests filed yet. All your surplus donations are currently active or edible.
+              <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>
+                No waste collection requests filed yet. Use the 1-click buttons above to schedule municipal diversion for surplus batches.
               </p>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -300,9 +373,9 @@ export default function WasteManagementPage() {
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
                       <th style={{ padding: '10px' }}>Ticket No</th>
-                      <th style={{ padding: '10px' }}>Food Waste</th>
+                      <th style={{ padding: '10px' }}>Food Waste Item</th>
                       <th style={{ padding: '10px' }}>Quantity</th>
-                      <th style={{ padding: '10px' }}>Municipal Ward</th>
+                      <th style={{ padding: '10px' }}>Municipal Facility</th>
                       <th style={{ padding: '10px' }}>Pickup Slot</th>
                       <th style={{ padding: '10px' }}>Status</th>
                     </tr>
@@ -319,8 +392,8 @@ export default function WasteManagementPage() {
                         <td style={{ padding: '12px 10px' }}>
                           {req.quantity}
                         </td>
-                        <td style={{ padding: '12px 10px', color: '#64748b' }}>
-                          {req.regionWard}
+                        <td style={{ padding: '12px 10px', color: '#047857', fontSize: '0.8rem', fontWeight: 600 }}>
+                          {req.wasteDestination}
                         </td>
                         <td style={{ padding: '12px 10px', color: '#64748b' }}>
                           {req.preferredSlot}

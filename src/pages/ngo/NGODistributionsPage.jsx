@@ -104,13 +104,23 @@ export default function NGODistributionsPage() {
                       Pickup Navigation & Route
                     </h3>
                     <FoodConnectMap
-                      donorLocation={{ lat: 26.8520, lng: 75.8050, label: selectedDonation.donorName }}
-                      ngoLocation={{ lat: 26.8920, lng: 75.8250, label: currentUser?.name || 'Hope Foundation' }}
+                      donorLocation={{
+                        lat: selectedDonation.pickupLatitude || selectedDonation.latitude || 26.8520,
+                        lng: selectedDonation.pickupLongitude || selectedDonation.longitude || 75.8050,
+                        label: selectedDonation.donorName,
+                        address: selectedDonation.pickupAddress
+                      }}
+                      ngoLocation={{
+                        lat: selectedDonation.dropLatitude || currentUser?.location?.lat || 26.8920,
+                        lng: selectedDonation.dropLongitude || currentUser?.location?.lng || 75.8250,
+                        label: currentUser?.organizationName || currentUser?.name || 'NGO Center',
+                        address: selectedDonation.dropAddress || currentUser?.address || 'Community Kitchen Distribution'
+                      }}
                       height="320px"
                     />
-                    <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#64748b' }}>
-                      <span>📍 Address: <strong>{selectedDonation.pickupAddress}</strong></span>
-                      <span>Target: Community Kitchen Distribution</span>
+                    <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '0.82rem', color: '#64748b' }}>
+                      <span>📍 Pickup Point: <strong>{selectedDonation.pickupAddress}</strong></span>
+                      <span>Target: <strong>{currentUser?.organizationName || 'NGO Kitchen Distribution'}</strong></span>
                     </div>
                   </div>
                 </div>
