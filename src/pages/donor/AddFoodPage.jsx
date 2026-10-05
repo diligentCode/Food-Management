@@ -5,8 +5,10 @@ import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import MapLocationPicker from '../../components/common/MapLocationPicker';
 import { useAuth } from '../../context/AuthContext';
-import { foodService } from '../../services/dataService';
+import { foodService, userService } from '../../services/dataService';
 import { analyzeFoodImage } from '../../services/aiService';
+import { runQuantumAnnealingMatch, dispatchQuantumMatchNotifications, getCandidateNgos } from '../../services/quantumService';
+import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 
 export default function AddFoodPage() {
   const { currentUser } = useAuth();
@@ -32,6 +34,10 @@ export default function AddFoodPage() {
   const [analyzingAi, setAnalyzingAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [createdListing, setCreatedListing] = useState(null);
+  const [quantumResult, setQuantumResult] = useState(null);
+  const [showQuantumResultModal, setShowQuantumResultModal] = useState(false);
+  const [showFullQuantumModal, setShowFullQuantumModal] = useState(false);
 
   const handleMapLocationSelect = ({ lat, lng, address: suggestedAddr }) => {
     setPickupLat(lat);
@@ -106,7 +112,7 @@ export default function AddFoodPage() {
       const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
       const pickupDeadline = `Within ${hours} hours (before ${new Date(Date.now() + hours * 3600 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
 
-      foodService.createListing({
+      const newListing = foodService.createListing({
         donorId: currentUser?.id,
         donorName: currentUser?.organizationName || currentUser?.name,
         foodName: foodName.trim(),
@@ -130,7 +136,33 @@ export default function AddFoodPage() {
         qualityAnalysis: aiAnalysis
       });
 
-      navigate('/donor/listings');
+      // ⚛️ AUTOMATIC QUANTUM AI ANNEALING MATCHING
+      const allUsers = userService.getUsers();
+      const candidateNgos = getCandidateNgos(newListing, allUsers);
+      const qRes = runQuantumAnnealingMatch({ listing: newListing, ngos: candidateNgos });
+
+      if (qRes && qRes.optimalNgo) {
+        foodService.updateListing(newListing.id, {
+          optimalNgoId: qRes.optimalNgo.ngo.id,
+          optimalNgoName: qRes.optimalNgo.ngo.organizationName || qRes.optimalNgo.ngo.name,
+          quantumScore: qRes.optimalNgo.qScore,
+          quantumMatch: {
+            optimalNgoId: qRes.optimalNgo.ngo.id,
+            optimalNgoName: qRes.optimalNgo.ngo.organizationName || qRes.optimalNgo.ngo.name,
+            qScore: qRes.optimalNgo.qScore,
+            distanceKm: qRes.optimalNgo.distanceKm,
+            etaMinutes: qRes.optimalNgo.etaMinutes,
+            carbonSavedKg: qRes.carbonSavedKg
+          }
+        });
+
+        // Automatically dispatch priority high-alert notification to the #1 Quantum Best Match
+        dispatchQuantumMatchNotifications(newListing, qRes);
+      }
+
+      setCreatedListing(newListing);
+      setQuantumResult(qRes);
+      setShowQuantumResultModal(true);
     } catch (err) {
       setError(err.message || 'Failed to create listing.');
     } finally {
@@ -467,6 +499,213 @@ export default function AddFoodPage() {
               />
             </div>
           </form>
+
+          {/* ⚛️ AUTOMATIC QUANTUM AI RESULT SUCCESS MODAL */}
+          {showQuantumResultModal && quantumResult && createdListing && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2100,
+              padding: '20px'
+            }}>
+              <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '20px',
+                maxWidth: '600px',
+                width: '100%',
+                boxShadow: '0 25px 60px -15px rgba(11, 70, 47, 0.3)',
+                border: '2px solid #10b981',
+                overflow: 'hidden'
+              }}>
+                {/* Top Banner */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #0b462f 0%, #064e3b 100%)',
+                  color: '#ffffff',
+                  padding: '24px',
+                  textAlign: 'center',
+                  position: 'relative'
+                }}>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    fontSize: '2rem',
+                    marginBottom: '10px'
+                  }}>
+                    ⚛️
+                  </div>
+                  <h2 style={{ fontSize: '1.35rem', fontWeight: 900, margin: '0 0 6px 0', color: '#ffffff' }}>
+                    Listing Published & Quantum Match Optimized!
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '0.86rem', color: '#a7f3d0' }}>
+                    Simulated Quantum Annealing ran automatically and identified the #1 best NGO pick.
+                  </p>
+                </div>
+
+                {/* Body Details */}
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Winner Highlight Card */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)',
+                    border: '2px solid #10b981',
+                    borderRadius: '14px',
+                    padding: '18px 20px',
+                    position: 'relative'
+                  }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-11px',
+                      right: '16px',
+                      background: '#10b981',
+                      color: '#ffffff',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      padding: '2px 10px',
+                      borderRadius: '10px'
+                    }}>
+                      🌟 #1 QUANTUM RECOMMENDED PICK
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.76rem', color: '#047857', fontWeight: 800, textTransform: 'uppercase' }}>
+                          Optimal Recipient Shelter
+                        </div>
+                        <h3 style={{ margin: '4px 0 6px 0', fontSize: '1.25rem', fontWeight: 900, color: '#0b462f' }}>
+                          🤝 {quantumResult.optimalNgo?.ngo?.organizationName || quantumResult.optimalNgo?.ngo?.name}
+                        </h3>
+                        <div style={{ fontSize: '0.82rem', color: '#475569', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                          <span>📍 <strong>{quantumResult.optimalNgo?.distanceKm} km</strong> transit distance</span>
+                          <span>⏱️ ETA: ~<strong>{quantumResult.optimalNgo?.etaMinutes} mins</strong></span>
+                          <span>🌱 <strong>~{quantumResult.carbonSavedKg} kg CO₂e</strong> saved</span>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#059669', lineHeight: 1 }}>
+                          {quantumResult.optimalNgo?.qScore}%
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: '#047857', fontWeight: 800 }}>
+                          OPTIMAL MATCH
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      marginTop: '14px',
+                      padding: '10px 14px',
+                      background: '#dcfce7',
+                      borderRadius: '8px',
+                      border: '1px solid #86efac',
+                      fontSize: '0.82rem',
+                      color: '#065f46',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span>🚀</span>
+                      <span>Priority High-Alert notification automatically dispatched to {quantumResult.optimalNgo?.ngo?.organizationName || quantumResult.optimalNgo?.ngo?.name}!</span>
+                    </div>
+                  </div>
+
+                  {/* Listing Summary */}
+                  <div style={{
+                    background: '#f8fafc',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.84rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <strong style={{ color: '#0f172a' }}>{createdListing.foodName}</strong> ({createdListing.quantity} {createdListing.unit})
+                      <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                        Freshness AI Score: {createdListing.qualityScore}% &bull; Type: {createdListing.listingType === 'paid' ? `₹${createdListing.price}` : 'FREE'}
+                      </div>
+                    </div>
+                    <span className="badge badge-success">Available Online</span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/donor/listings')}
+                      className="btn btn-primary"
+                      style={{
+                        padding: '12px',
+                        fontSize: '0.95rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span>📋 Go to My Food Listings &rarr;</span>
+                    </button>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowFullQuantumModal(true)}
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          padding: '10px',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          color: '#0b462f',
+                          borderColor: '#a7f3d0',
+                          background: '#ecfdf5'
+                        }}
+                      >
+                        ⚛️ View Full Quantum Specs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowQuantumResultModal(false);
+                          setFoodName('');
+                          setQuantity('');
+                          setImageURL('');
+                          setAiAnalysis(null);
+                        }}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '10px', fontSize: '0.82rem', fontWeight: 700 }}
+                      >
+                        ➕ List Another Batch
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full Detailed Quantum Specs Modal */}
+          {showFullQuantumModal && createdListing && (
+            <QuantumMatchModal
+              listing={createdListing}
+              isOpen={showFullQuantumModal}
+              onClose={() => setShowFullQuantumModal(false)}
+              initialResult={quantumResult}
+            />
+          )}
         </div>
       </div>
     </div>

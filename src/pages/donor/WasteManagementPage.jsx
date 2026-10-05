@@ -21,8 +21,13 @@ export default function WasteManagementPage() {
   const loadData = () => {
     if (currentUser) {
       setRequests(wasteService.getDonorRequests(currentUser.id));
-      const listings = foodService.getDonorListings(currentUser.id);
-      setDonorListings(listings);
+      const allListings = foodService.getDonorListings(currentUser.id);
+      
+      // Filter: Only food items that are not yet delivered and not out for delivery
+      // Delivered, in-transit, or NGO-claimed batches must never appear in waste management
+      const EXCLUDED_STATUSES = ['delivered', 'completed', 'picked_up', 'in_transit', 'pickup_started', 'accepted'];
+      const eligibleListings = allListings.filter(item => !EXCLUDED_STATUSES.includes(item.status));
+      setDonorListings(eligibleListings);
     }
   };
 
@@ -261,10 +266,10 @@ export default function WasteManagementPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
-                  Your Listed Food Batches ({donorListings.length})
+                  Eligible Surplus Food Batches ({donorListings.length})
                 </h3>
                 <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
-                  No need to re-type details. 1-click schedule municipal waste collection for any expired or leftover posting using existing data:
+                  Only food items that have not yet been delivered or are not out for delivery appear here. Delivered or in-transit donations are excluded from municipal waste processing.
                 </p>
               </div>
 
@@ -310,10 +315,10 @@ export default function WasteManagementPage() {
 
             {donorListings.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 20px', color: '#64748b' }}>
-                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🍲</div>
-                <strong style={{ color: '#0f172a' }}>No Food Listings Created Yet</strong>
-                <p style={{ fontSize: '0.82rem', marginTop: '4px' }}>
-                  When you create food listings in "List Surplus Food", any batches that expire or require bio-waste diversion can be sent for municipal pickup directly from here.
+                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🌱</div>
+                <strong style={{ color: '#0f172a', fontSize: '1.05rem' }}>No Food Batches Requiring Waste Collection</strong>
+                <p style={{ fontSize: '0.84rem', marginTop: '4px', maxWidth: '520px', margin: '6px auto 0 auto' }}>
+                  All your active surplus donations are either safely delivered to beneficiaries, currently in transit, or no expired food batches require municipal pickup.
                 </p>
               </div>
             ) : (

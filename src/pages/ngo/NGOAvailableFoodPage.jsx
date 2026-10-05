@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { foodService, donationService, isListingExpired } from '../../services/dataService';
+import { foodService, donationService, userService, isListingExpired } from '../../services/dataService';
+import { isUserOptimalNgo } from '../../services/quantumService';
 import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 
 export default function NGOAvailableFoodPage() {
@@ -148,9 +149,54 @@ export default function NGOAvailableFoodPage() {
             ) : (
               filtered.map((food) => {
                 const expired = isListingExpired(food);
+                const allUsers = userService.getUsers();
+                const isTopPick = isUserOptimalNgo(food, currentUser, allUsers);
+                const qScore = food.quantumScore || 96;
 
                 return (
-                  <div key={food.id} className="card" style={{ padding: '0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <div
+                    key={food.id}
+                    className="card"
+                    style={{
+                      padding: '0',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      border: isTopPick ? '2.5px solid #10b981' : '1px solid var(--color-border)',
+                      boxShadow: isTopPick ? '0 10px 25px -5px rgba(16, 185, 129, 0.25)' : undefined,
+                      position: 'relative'
+                    }}
+                  >
+                    {/* 🌟 Top Callout Banner if current NGO is the #1 Quantum Best Match */}
+                    {isTopPick && (
+                      <div style={{
+                        background: 'linear-gradient(90deg, #0b462f 0%, #15803d 100%)',
+                        color: '#ffffff',
+                        padding: '8px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        letterSpacing: '0.02em'
+                      }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>🌟</span>
+                          <span>YOU ARE THE #1 BEST MATCH (Quantum Pick)</span>
+                        </span>
+                        <span style={{
+                          background: '#10b981',
+                          color: '#ffffff',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800
+                        }}>
+                          {qScore}% Optimal
+                        </span>
+                      </div>
+                    )}
+
                     <div style={{ height: '180px', position: 'relative', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {food.imageURL ? (
                         <img
@@ -194,16 +240,25 @@ export default function NGOAvailableFoodPage() {
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
                         <span className="meta-pill pill-muted">⚖️ {food.quantity} {food.unit}</span>
                         <span className="meta-pill pill-fresh">✨ AI: {food.qualityScore || 75}%</span>
+                        
+                        {/* Quantum Match Pill */}
                         <button
                           type="button"
                           onClick={() => setQuantumModalItem(food)}
                           style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }}
                           title="View Quantum Match Analysis"
                         >
-                          <span className="meta-pill" style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontWeight: 700 }}>
-                            ⚛️ Q-Match: 95%
-                          </span>
+                          {isTopPick ? (
+                            <span className="meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1.5px solid #10b981', fontWeight: 800 }}>
+                              🌟 Best Pick ({qScore}%)
+                            </span>
+                          ) : (
+                            <span className="meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}>
+                              ⚛️ Q-Match: {food.quantumScore || 85}%
+                            </span>
+                          )}
                         </button>
+
                         {expired ? (
                           <span className="meta-pill pill-expiry">⚠️ Expired</span>
                         ) : (
@@ -220,7 +275,7 @@ export default function NGOAvailableFoodPage() {
                           type="button"
                           onClick={() => setQuantumModalItem(food)}
                           className="btn btn-secondary btn-sm"
-                          style={{ background: '#f8fafc', color: '#0284c7', border: '1px solid #cbd5e1', fontSize: '0.76rem', fontWeight: 700 }}
+                          style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.76rem', fontWeight: 700 }}
                         >
                           ⚛️ View Quantum Routing
                         </button>
@@ -228,9 +283,14 @@ export default function NGOAvailableFoodPage() {
                           onClick={() => setAcceptingItem(food)}
                           disabled={expired}
                           className="btn btn-primary"
-                          style={{ width: '100%', opacity: expired ? 0.5 : 1 }}
+                          style={{
+                            width: '100%',
+                            opacity: expired ? 0.5 : 1,
+                            background: isTopPick ? 'linear-gradient(135deg, #0b462f, #15803d)' : undefined,
+                            fontWeight: isTopPick ? 800 : undefined
+                          }}
                         >
-                          {expired ? 'Expired' : food.listingType === 'paid' ? '🤝 Accept & Settle (Paid)' : '🤝 Accept Food Donation'}
+                          {expired ? 'Expired' : isTopPick ? '🌟 Priority Accept (Best Pick)' : food.listingType === 'paid' ? '🤝 Accept & Settle (Paid)' : '🤝 Accept Food Donation'}
                         </button>
                       </div>
                     </div>

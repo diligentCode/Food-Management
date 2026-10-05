@@ -5,8 +5,8 @@ import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import FoodConnectMap from '../../components/common/FoodConnectMap';
 import QuantumMatchModal from '../../components/common/QuantumMatchModal';
-import { useAuth } from '../../context/AuthContext';
-import { foodService, donationService, isListingExpired, calculateDistanceKm } from '../../services/dataService';
+import { foodService, donationService, userService, isListingExpired, calculateDistanceKm } from '../../services/dataService';
+import { isUserOptimalNgo } from '../../services/quantumService';
 import '../../styles/Dashboard.css';
 
 export default function NGODashboard() {
@@ -201,6 +201,9 @@ export default function NGODashboard() {
                   ) : (
                     filteredListings.map((item) => {
                       const expired = isListingExpired(item);
+                      const allUsers = userService.getUsers();
+                      const isTopPick = isUserOptimalNgo(item, currentUser, allUsers);
+                      const qScore = item.quantumScore || 96;
                       const distanceKm = calculateDistanceKm(
                         item.latitude,
                         item.longitude,
@@ -209,7 +212,15 @@ export default function NGODashboard() {
                       );
 
                       return (
-                        <div key={item.id} className="listing-row-card">
+                        <div
+                          key={item.id}
+                          className="listing-row-card"
+                          style={{
+                            border: isTopPick ? '2px solid #10b981' : undefined,
+                            backgroundColor: isTopPick ? '#f0fdf4' : undefined,
+                            boxShadow: isTopPick ? '0 6px 18px rgba(16, 185, 129, 0.18)' : undefined
+                          }}
+                        >
                           <div className="listing-thumb-wrap">
                             <span className="listing-new-tag">New</span>
                             {item.imageURL ? (
@@ -226,6 +237,30 @@ export default function NGODashboard() {
                           </div>
 
                           <div className="listing-info">
+                            {/* 🌟 Top Callout Ribbon if current NGO is the #1 Quantum Best Match */}
+                            {isTopPick && (
+                              <div style={{
+                                background: 'linear-gradient(90deg, #ecfdf5, #d1fae5)',
+                                border: '1.5px solid #10b981',
+                                borderRadius: '8px',
+                                padding: '4px 10px',
+                                marginBottom: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '0.9rem' }}>🌟</span>
+                                  <strong style={{ fontSize: '0.78rem', color: '#065f46' }}>
+                                    YOU ARE THE #1 BEST MATCH (Quantum Pick)
+                                  </strong>
+                                </div>
+                                <span style={{ background: '#0b462f', color: '#ffffff', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800 }}>
+                                  {qScore}% Optimal
+                                </span>
+                              </div>
+                            )}
+
                             <div className="listing-info-top">
                               <h3 className="listing-food-name">{item.foodName}</h3>
                               {item.listingType === 'paid' ? (
@@ -259,9 +294,15 @@ export default function NGODashboard() {
                                 style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }}
                                 title="View Quantum Match Analysis"
                               >
-                                <span className="meta-pill" style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontWeight: 700 }}>
-                                  ⚛️ Q-Match: 95%
-                                </span>
+                                {isTopPick ? (
+                                  <span className="meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1.5px solid #10b981', fontWeight: 800 }}>
+                                    🌟 Best Pick ({qScore}%)
+                                  </span>
+                                ) : (
+                                  <span className="meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}>
+                                    ⚛️ Q-Match: {item.quantumScore || 85}%
+                                  </span>
+                                )}
                               </button>
                             </div>
                           </div>
@@ -287,7 +328,7 @@ export default function NGODashboard() {
                                 type="button"
                                 onClick={() => setQuantumModalItem(item)}
                                 className="btn btn-secondary btn-sm"
-                                style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontSize: '0.74rem' }}
+                                style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.74rem', fontWeight: 700 }}
                                 title="View Quantum Match Analysis"
                               >
                                 ⚛️ Quantum
@@ -296,9 +337,14 @@ export default function NGODashboard() {
                                 onClick={() => handleAcceptFood(item)}
                                 disabled={acceptingId === item.id || expired}
                                 className="btn btn-primary btn-sm"
-                                style={{ minWidth: '85px', opacity: expired ? 0.5 : 1 }}
+                                style={{
+                                  minWidth: '85px',
+                                  opacity: expired ? 0.5 : 1,
+                                  background: isTopPick ? 'linear-gradient(135deg, #0b462f, #15803d)' : undefined,
+                                  fontWeight: isTopPick ? 800 : undefined
+                                }}
                               >
-                                {acceptingId === item.id ? 'Accepting...' : '✓ Accept'}
+                                {acceptingId === item.id ? 'Accepting...' : isTopPick ? '🌟 Priority Accept' : '✓ Accept'}
                               </button>
                               <button
                                 onClick={() => setSelectedFood(item)}

@@ -145,6 +145,11 @@ export default function MyListingsPage() {
                       <span className="meta-pill pill-fresh">
                         ✨ AI Score: {item.qualityScore || 75}%
                       </span>
+                      {item.optimalNgoName && (
+                        <span className="meta-pill" style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 700 }}>
+                          ⚛️ Quantum Pick: {item.optimalNgoName} ({item.quantumScore || 96}%)
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -168,7 +173,7 @@ export default function MyListingsPage() {
                             type="button"
                             onClick={() => setQuantumModalItem(item)}
                             className="btn btn-secondary btn-sm"
-                            style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
                             title="Run Simulated Quantum Annealing to find optimal recipient NGO"
                           >
                             <span>⚛️</span> Quantum Match

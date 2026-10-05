@@ -194,3 +194,61 @@ export function dispatchQuantumMatchNotifications(listing, quantumResult) {
     });
   });
 }
+
+/**
+ * Retrieves eligible candidate NGOs for quantum matching.
+ * Uses real registered NGOs in the platform, or realistic local NGO shelters if none exist.
+ */
+export function getCandidateNgos(listing, allUsers = []) {
+  let candidates = allUsers.filter(u => u && u.role === 'ngo');
+  if (candidates.length === 0) {
+    const lat = Number(listing?.latitude) || 21.1458;
+    const lng = Number(listing?.longitude) || 79.0882;
+    const city = listing?.city || 'Nagpur';
+    candidates = [
+      {
+        id: 'ngo_demo_1',
+        name: 'Hope Foundation & Community Kitchen',
+        organizationName: 'Hope Foundation & Community Kitchen',
+        city,
+        location: { lat: lat + 0.012, lng: lng + 0.010 }
+      },
+      {
+        id: 'ngo_demo_2',
+        name: 'Annapurna Seva Trust (Central Shelter)',
+        organizationName: 'Annapurna Seva Trust (Central Shelter)',
+        city,
+        location: { lat: lat - 0.025, lng: lng - 0.018 }
+      },
+      {
+        id: 'ngo_demo_3',
+        name: 'Robin Hood Food Relief Mission',
+        organizationName: 'Robin Hood Food Relief Mission',
+        city,
+        location: { lat: lat + 0.045, lng: lng + 0.035 }
+      }
+    ];
+  }
+  return candidates;
+}
+
+/**
+ * Runs or retrieves quantum annealing match for a given listing.
+ */
+export function getQuantumMatchForListing(listing, allUsers = []) {
+  if (!listing) return null;
+  const candidates = getCandidateNgos(listing, allUsers);
+  return runQuantumAnnealingMatch({ listing, ngos: candidates });
+}
+
+/**
+ * Returns true if the given NGO user is the #1 optimal quantum pick for this food listing.
+ */
+export function isUserOptimalNgo(listing, user, allUsers = []) {
+  if (!listing || !user || user.role !== 'ngo') return false;
+  if (listing.optimalNgoId) {
+    return listing.optimalNgoId === user.id;
+  }
+  const result = getQuantumMatchForListing(listing, allUsers);
+  return result?.optimalNgo?.ngo?.id === user.id;
+}
