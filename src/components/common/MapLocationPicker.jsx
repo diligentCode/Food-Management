@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getGeminiApiKey } from '../../services/aiService';
 
 // Tile provider definitions (Google Maps high-fidelity roadmap & satellite hybrid + OSM)
 const MAP_LAYERS = {
@@ -111,6 +112,62 @@ function parseCoordinatesOrUrl(input) {
     return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
   }
 
+  return null;
+}
+
+// AI POI Locator using Gemini Geographic Intelligence
+// Finds exact coordinates of restaurants, messes, cafes, and buildings that might not be in OpenStreetMap
+async function queryGeminiPoiLocator(query, currentLat, currentLng) {
+  const key = getGeminiApiKey();
+  if (!key) return null;
+
+  const prompt = `You are a high-precision geographic locator for Indian cities and landmarks.
+Find the exact location and coordinates of: "${query}" near coordinates (${currentLat}, ${currentLng}) (India).
+Provide the exact or closest known establishment, restaurant, mess, hotel, hospital, or building.
+Return JSON in this format:
+{
+  "found": true,
+  "name": "Exact Name",
+  "locality": "Locality/Road/Landmark, City",
+  "lat": 21.xxxx,
+  "lng": 79.xxxx
+}
+If completely unknown or not in India: {"found": false}`;
+
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { response_mime_type: 'application/json' }
+  };
+
+  const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  for (const m of candidateModels) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const clean = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(clean);
+          if (parsed.found && parsed.lat && parsed.lng) {
+            return {
+              title: parsed.name || query,
+              fullName: `${parsed.name || query}, ${parsed.locality || ''}`.trim(),
+              lat: Number(parsed.lat),
+              lng: Number(parsed.lng),
+              source: 'Gemini Places AI'
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // try next model
+    }
+  }
   return null;
 }
 
@@ -258,7 +315,7 @@ export default function MapLocationPicker({
     }
   };
 
-  // Smart Search: Coordinates Parser + Proximity-Ranked POI Geocoding
+  // Smart Search: Coordinates Parser + Dual Geocoders + AI Landmark Intelligence
   const handleSearch = async (e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
@@ -272,7 +329,7 @@ export default function MapLocationPicker({
     if (parsedCoords) {
       const { lat, lng } = parsedCoords;
       if (mapInstanceRef.current && markerRef.current) {
-        mapInstanceRef.current.flyTo([lat, lng], 16, { duration: 1.2 });
+        mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1.2 });
         markerRef.current.setLatLng([lat, lng]);
       }
       updateCoordinates(lat, lng);
@@ -299,7 +356,28 @@ export default function MapLocationPicker({
         `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${currentLat}&lon=${currentLng}&limit=8`
       ).then(res => res.json()).catch(() => ({ features: [] }));
 
-      const [nomResults, photonData] = await Promise.all([nominatimPromise, photonPromise]);
+      // C. Gemini AI Landmark Locator (Finds local restaurants, messes, cafes not in OSM)
+      const geminiPoiPromise = queryGeminiPoiLocator(query, currentLat, currentLng);
+
+      const [nomResults, photonData, geminiPoi] = await Promise.all([
+        nominatimPromise,
+        photonPromise,
+        geminiPoiPromise
+      ]);
+
+      // If Gemini AI recognized the restaurant/mess, inject it at top
+      if (geminiPoi && geminiPoi.lat && geminiPoi.lng) {
+        const distKm = getDistKm(currentLat, currentLng, geminiPoi.lat, geminiPoi.lng);
+        candidates.push({
+          title: geminiPoi.title,
+          fullName: geminiPoi.fullName,
+          lat: geminiPoi.lat,
+          lng: geminiPoi.lng,
+          distKm,
+          source: 'Gemini Places AI',
+          isAiVerified: true
+        });
+      }
 
       // Process Nominatim results
       if (Array.isArray(nomResults)) {
@@ -314,7 +392,8 @@ export default function MapLocationPicker({
             lat,
             lng,
             distKm,
-            source: 'OSM'
+            source: 'OSM',
+            isAiVerified: false
           });
         });
       }
@@ -336,7 +415,8 @@ export default function MapLocationPicker({
             lat,
             lng,
             distKm,
-            source: 'Photon'
+            source: 'Photon',
+            isAiVerified: false
           });
         });
       }
@@ -350,11 +430,20 @@ export default function MapLocationPicker({
         }
       });
 
-      // SORT CLOSEST FIRST (Proximity ranking)
-      unique.sort((a, b) => a.distKm - b.distKm);
+      // Prioritize AI-verified landmark match if present, otherwise sort closest first
+      unique.sort((a, b) => {
+        if (a.isAiVerified && !b.isAiVerified) return -1;
+        if (!a.isAiVerified && b.isAiVerified) return 1;
+        return a.distKm - b.distKm;
+      });
 
       if (unique.length > 0) {
         setSearchResults(unique.slice(0, 6));
+
+        // If the top match is an AI-verified landmark and only 1 match or user hit enter, auto-focus
+        if (unique[0].isAiVerified) {
+          setStatusText(`✨ Found landmark: ${unique[0].title}. Click to select or view below.`);
+        }
       } else {
         setStatusText(`No direct match for "${query}". Try copying coordinates from Google Maps, or drag the pin directly.`);
       }
@@ -369,11 +458,12 @@ export default function MapLocationPicker({
     const lat = result.lat;
     const lng = result.lng;
     if (mapInstanceRef.current && markerRef.current) {
-      mapInstanceRef.current.flyTo([lat, lng], 16, { duration: 1.2 });
+      mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1.2 });
       markerRef.current.setLatLng([lat, lng]);
     }
     const shortAddress = result.fullName.split(',').slice(0, 3).join(',').trim();
     updateCoordinates(lat, lng, shortAddress);
+    setStatusText(`✓ Pinned on: ${result.title} (${shortAddress})`);
     setSearchResults([]);
     setSearchQuery('');
   };
@@ -426,7 +516,7 @@ export default function MapLocationPicker({
                 handleSearch(e);
               }
             }}
-            placeholder="Search restaurant, building, or paste Google Maps coords..."
+            placeholder="Search restaurant, mess, building, or coords..."
             style={{
               flex: 1,
               padding: '8px 12px',
@@ -446,7 +536,7 @@ export default function MapLocationPicker({
             className="btn btn-secondary btn-sm"
             style={{ fontSize: '0.82rem', padding: '8px 12px', fontWeight: 600 }}
           >
-            {searching ? 'Searching...' : '🔍 Search'}
+            {searching ? 'Locating...' : '🔍 Search'}
           </button>
         </div>
 
@@ -480,7 +570,7 @@ export default function MapLocationPicker({
       <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
         <span>💡</span>
         <span>
-          <strong>Pro-tip:</strong> You can paste exact coordinates (e.g. <code>21.1458, 79.0882</code>) or a Google Maps share link directly into the search box!
+          <strong>Smart Locator:</strong> Searches Google landmarks, messes, restaurants, streets, or exact coordinates (e.g. <code>21.1458, 79.0882</code>).
         </span>
       </div>
 
@@ -496,7 +586,7 @@ export default function MapLocationPicker({
           zIndex: 1000
         }}>
           <div style={{ padding: '6px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>
-            Closest Matches (Ranked by proximity to map center):
+            Matching Places & Establishments:
           </div>
           {searchResults.map((item, idx) => (
             <div
@@ -517,21 +607,24 @@ export default function MapLocationPicker({
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
             >
               <div style={{ flex: 1 }}>
-                <strong style={{ color: '#0f172a' }}>📍 {item.title}</strong>
+                <strong style={{ color: '#0f172a' }}>
+                  {item.isAiVerified ? '✨ ' : '📍 '}
+                  {item.title}
+                </strong>
                 <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                   {item.fullName}
                 </div>
               </div>
               <span style={{
                 fontSize: '0.7rem',
-                padding: '3px 7px',
+                padding: '3px 8px',
                 borderRadius: '10px',
-                background: item.distKm < 25 ? '#dcfce7' : '#f1f5f9',
-                color: item.distKm < 25 ? '#15803d' : '#64748b',
+                background: item.isAiVerified ? '#fef3c7' : item.distKm < 25 ? '#dcfce7' : '#f1f5f9',
+                color: item.isAiVerified ? '#b45309' : item.distKm < 25 ? '#15803d' : '#64748b',
                 fontWeight: 700,
                 whiteSpace: 'nowrap'
               }}>
-                {item.distKm < 25 ? `🎯 ${item.distKm} km (Nearby)` : `${item.distKm} km`}
+                {item.isAiVerified ? `✨ Verified Place (${item.distKm} km)` : item.distKm < 25 ? `🎯 ${item.distKm} km (Nearby)` : `${item.distKm} km`}
               </span>
             </div>
           ))}
