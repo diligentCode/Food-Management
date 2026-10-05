@@ -5,6 +5,7 @@ import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import FoodConnectMap from '../../components/common/FoodConnectMap';
 import QuantumMatchModal from '../../components/common/QuantumMatchModal';
+import { useAuth } from '../../context/AuthContext';
 import { foodService, donationService, userService, isListingExpired, calculateDistanceKm } from '../../services/dataService';
 import { isUserOptimalNgo } from '../../services/quantumService';
 import '../../styles/Dashboard.css';
@@ -20,8 +21,8 @@ export default function NGODashboard() {
   const [selectedFood, setSelectedFood] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
   const [quantumModalItem, setQuantumModalItem] = useState(null);
-  const [paymentOption, setPaymentOption] = useState('pickup_cash'); // 'pickup_cash' | 'direct_upi'
   const [successMessage, setSuccessMessage] = useState('');
+  const allUsers = userService.getUsers();
 
   const loadData = () => {
     setAvailableListings(foodService.getAvailableListings());
@@ -201,15 +202,14 @@ export default function NGODashboard() {
                   ) : (
                     filteredListings.map((item) => {
                       const expired = isListingExpired(item);
-                      const allUsers = userService.getUsers();
                       const isTopPick = isUserOptimalNgo(item, currentUser, allUsers);
                       const qScore = item.quantumScore || 96;
-                      const distanceKm = calculateDistanceKm(
-                        item.latitude,
-                        item.longitude,
-                        currentUser?.location?.lat || 26.8920,
-                        currentUser?.location?.lng || 75.8250
-                      );
+                        const distanceKm = calculateDistanceKm(
+                          item.latitude,
+                          item.longitude,
+                          currentUser?.location?.lat || 26.8920,
+                          currentUser?.location?.lng || 75.8250
+                        );
 
                       return (
                         <div

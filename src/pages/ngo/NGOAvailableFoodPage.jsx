@@ -17,6 +17,8 @@ export default function NGOAvailableFoodPage() {
   const [paymentOption, setPaymentOption] = useState('pickup_cash');
   const [quantumModalItem, setQuantumModalItem] = useState(null);
 
+  const allUsers = userService.getUsers();
+
   const loadListings = () => {
     setListings(foodService.getAvailableListings());
   };
@@ -149,7 +151,6 @@ export default function NGOAvailableFoodPage() {
             ) : (
               filtered.map((food) => {
                 const expired = isListingExpired(food);
-                const allUsers = userService.getUsers();
                 const isTopPick = isUserOptimalNgo(food, currentUser, allUsers);
                 const qScore = food.quantumScore || 96;
 

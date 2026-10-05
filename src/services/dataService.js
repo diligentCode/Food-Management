@@ -19,7 +19,7 @@ import {
   query, 
   where, 
   onSnapshot 
-} from './firebase';
+} from './firebase.js';
 
 const STORAGE_KEYS = {
   USERS: 'foodconnect_users_v2',
@@ -612,10 +612,10 @@ export const userService = {
     const users = this.getUsers();
     const newUser = {
       id: userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: userData.name || userData.organizationName,
-      email: userData.email,
+      name: userData.name || userData.organizationName || 'User',
+      email: userData.email || '',
       phone: userData.phone || '',
-      role: userData.role, // 'donor' | 'ngo' | 'admin'
+      role: userData.role || 'donor', // 'donor' | 'ngo' | 'admin'
       organizationName: userData.organizationName || userData.name,
       address: userData.address || '',
       city: userData.city || 'Jaipur',
@@ -706,12 +706,12 @@ export const foodService = {
 
     const newListing = {
       id: 'food_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      donorId: listingData.donorId,
-      donorName: listingData.donorName,
-      foodName: listingData.foodName,
-      category: listingData.category,
+      donorId: listingData.donorId || 'anonymous_donor',
+      donorName: listingData.donorName || 'Donor Kitchen',
+      foodName: listingData.foodName || 'Surplus Meal Batch',
+      category: listingData.category || 'Meals',
       description: listingData.description || '',
-      quantity: Number(listingData.quantity),
+      quantity: Number(listingData.quantity) || 1,
       unit: listingData.unit || 'kg',
       foodType: listingData.foodType || 'Vegetarian',
       preparedAt: listingData.preparedAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -721,11 +721,15 @@ export const foodService = {
       pickupAddress: listingData.pickupAddress || '',
       latitude: Number(listingData.latitude) || 26.8520,
       longitude: Number(listingData.longitude) || 75.8050,
+      city: listingData.city || 'Nagpur',
       listingType: listingData.listingType || 'free',
       price: listingData.listingType === 'paid' ? Number(listingData.price || 0) : 0,
       qualityScore: typeof listingData.qualityScore === 'number' ? listingData.qualityScore : 75,
       qualityStatus: listingData.qualityStatus || (listingData.qualityScore >= 78 ? 'Good Quality (Optimal)' : 'Acceptable Quality'),
       qualityAnalysis: listingData.qualityAnalysis || null,
+      optimalNgoId: listingData.optimalNgoId || null,
+      optimalNgoName: listingData.optimalNgoName || null,
+      quantumScore: listingData.quantumScore || null,
       status: 'available',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

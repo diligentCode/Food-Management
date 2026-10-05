@@ -4,7 +4,7 @@
 // Formulates matching as an Ising Spin Hamiltonian QUBO Minimization
 // ===================================================================
 
-import { calculateDistanceKm, notificationService } from './dataService';
+import { calculateDistanceKm, notificationService } from './dataService.js';
 
 /**
  * Mathematical formulation of the Quantum Annealing Hamiltonian:
@@ -199,8 +199,13 @@ export function dispatchQuantumMatchNotifications(listing, quantumResult) {
  * Retrieves eligible candidate NGOs for quantum matching.
  * Uses real registered NGOs in the platform, or realistic local NGO shelters if none exist.
  */
-export function getCandidateNgos(listing, allUsers = []) {
+export function getCandidateNgos(listing, allUsers = [], currentUser = null) {
   let candidates = allUsers.filter(u => u && u.role === 'ngo');
+  if (currentUser && currentUser.role === 'ngo') {
+    if (!candidates.some(c => c.id === currentUser.id)) {
+      candidates.push(currentUser);
+    }
+  }
   if (candidates.length === 0) {
     const lat = Number(listing?.latitude) || 21.1458;
     const lng = Number(listing?.longitude) || 79.0882;
@@ -235,9 +240,9 @@ export function getCandidateNgos(listing, allUsers = []) {
 /**
  * Runs or retrieves quantum annealing match for a given listing.
  */
-export function getQuantumMatchForListing(listing, allUsers = []) {
+export function getQuantumMatchForListing(listing, allUsers = [], currentUser = null) {
   if (!listing) return null;
-  const candidates = getCandidateNgos(listing, allUsers);
+  const candidates = getCandidateNgos(listing, allUsers, currentUser);
   return runQuantumAnnealingMatch({ listing, ngos: candidates });
 }
 
@@ -249,6 +254,6 @@ export function isUserOptimalNgo(listing, user, allUsers = []) {
   if (listing.optimalNgoId) {
     return listing.optimalNgoId === user.id;
   }
-  const result = getQuantumMatchForListing(listing, allUsers);
+  const result = getQuantumMatchForListing(listing, allUsers, user);
   return result?.optimalNgo?.ngo?.id === user.id;
 }
