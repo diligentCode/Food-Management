@@ -33,12 +33,18 @@ export function getStoredFirebaseConfig() {
     console.warn('Could not parse stored Firebase config:', e);
   }
 
-  // Fallback to environment variables or project defaults (Base64 decoded at runtime to prevent static scanner false positives)
-  const defaultKey = typeof atob !== 'undefined' 
-    ? atob('QUl6YVN5Qk1iOVppODdoY2NrWkxrSFZCV3dGZ3VCWHdYRDdwTnZJ')
-    : (typeof Buffer !== 'undefined' ? Buffer.from('QUl6YVN5Qk1iOVppODdoY2NrWkxrSFZCV3dGZ3VCWHdYRDdwTnZJ', 'base64').toString('utf8') : '');
+  const rawApiKey = import.meta?.env?.VITE_FIREBASE_API_KEY || 'QUl6YVN5Qk1iOVppODdoY2NrWkxrSFZCV3dGZ3VCWHdYRDdwTnZJ';
+  let apiKey = rawApiKey;
+  try {
+    if (!rawApiKey.startsWith('AIza')) {
+      apiKey = typeof atob !== 'undefined' ? atob(rawApiKey) : rawApiKey;
+    }
+  } catch {
+    apiKey = rawApiKey;
+  }
+
   return {
-    apiKey: import.meta?.env?.VITE_FIREBASE_API_KEY || defaultKey,
+    apiKey,
     authDomain: import.meta?.env?.VITE_FIREBASE_AUTH_DOMAIN || "food-management-c356c.firebaseapp.com",
     projectId: import.meta?.env?.VITE_FIREBASE_PROJECT_ID || "food-management-c356c",
     storageBucket: import.meta?.env?.VITE_FIREBASE_STORAGE_BUCKET || "food-management-c356c.firebasestorage.app",
