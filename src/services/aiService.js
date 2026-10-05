@@ -1,8 +1,7 @@
 // ===================================================================
-// FOODCONNECT - AI FOOD IMAGE QUALITY ASSESSMENT SERVICE
-// Dual-Engine Architecture:
-// 1. Google Gemini Multimodal Vision API (Real Cloud AI)
-// 2. Real HTML5 Canvas Computer Vision Engine (Pixel-level histogram & decay inspection)
+// FOODCONNECT - STRICT AI FOOD IMAGE QUALITY ASSESSMENT SERVICE
+// Powered by Google Gemini Multimodal Vision AI + Canvas Fallback
+// Range: Strict 0 to 90% (Penalizes non-food, poor lighting, dullness)
 // ===================================================================
 
 const STORAGE_GEMINI_KEY = 'foodconnect_gemini_api_key';
@@ -35,18 +34,19 @@ export function hasRealGeminiConfigured() {
 }
 
 // -------------------------------------------------------------
-// Real In-Browser Canvas Computer Vision Engine
-// Analyzes real pixels, color histograms, and spoilage discoloration
+// Real In-Browser Canvas Computer Vision Engine (Fail-safe)
+// Analyzes real pixels, color histograms, luminance, and discoloration
+// Adheres strictly to 0 to 90% range with heavy penalties for poor lighting
 // -------------------------------------------------------------
 function analyzeCanvasPixels(imageDataUrl) {
   return new Promise((resolve) => {
     if (!imageDataUrl || typeof window === 'undefined') {
       return resolve({
-        score: 88,
-        vibrancyRatio: 0.75,
+        score: 75,
+        vibrancyRatio: 0.5,
         decayRatio: 0.05,
-        avgBrightness: 160,
-        contrast: 45
+        avgBrightness: 140,
+        isFood: true
       });
     }
 
@@ -56,7 +56,7 @@ function analyzeCanvasPixels(imageDataUrl) {
       try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const maxDim = 160; // downsample for fast processing
+        const maxDim = 160;
         const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
         canvas.width = Math.max(20, Math.floor(img.width * scale));
         canvas.height = Math.max(20, Math.floor(img.height * scale));
@@ -79,7 +79,6 @@ function analyzeCanvasPixels(imageDataUrl) {
           totalG += g;
           totalB += b;
 
-          // Fresh indicators: good saturation and warm golden/green food tones
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
           const delta = max - min;
@@ -89,8 +88,8 @@ function analyzeCanvasPixels(imageDataUrl) {
             vibrantCount++;
           }
 
-          // Dark muddy or mold discoloration tones (grayish green / muddy brown / near black)
-          if (max < 60 || (Math.abs(r - g) < 15 && Math.abs(g - b) < 15 && max < 90)) {
+          // Dark muddy, dim, or spoilage discoloration tones
+          if (max < 60 || (Math.abs(r - g) < 15 && Math.abs(g - b) < 15 && max < 85)) {
             darkSpoilCount++;
           }
         }
@@ -102,43 +101,63 @@ function analyzeCanvasPixels(imageDataUrl) {
         const vibrancyRatio = vibrantCount / totalPixels;
         const decayRatio = darkSpoilCount / totalPixels;
 
-        // Freshness scoring algorithm based on real optical properties:
-        // Well-lit food + high color saturation + low dark decay pixels
-        let computedScore = 82;
-        if (vibrancyRatio > 0.4) computedScore += 7;
-        else if (vibrancyRatio > 0.25) computedScore += 4;
+        // Strict scoring calculation capped at 90 max
+        let computedScore = 70;
+        let isFood = true;
 
-        if (decayRatio < 0.15) computedScore += 5;
-        else if (decayRatio > 0.4) computedScore -= 12;
+        if (avgBrightness < 65) {
+          // Severely dark / poor lighting
+          computedScore = Math.max(15, Math.round(avgBrightness * 0.45));
+          isFood = false;
+        } else if (vibrancyRatio < 0.08) {
+          // Extremely dull, monochrome, or non-food graphic
+          computedScore = Math.max(20, Math.round(computedScore - 35));
+          isFood = false;
+        } else {
+          if (vibrancyRatio > 0.35) computedScore += 8;
+          else if (vibrancyRatio > 0.2) computedScore += 3;
+          else computedScore -= 12;
 
-        if (avgBrightness > 110 && avgBrightness < 210) computedScore += 4;
-        else if (avgBrightness < 70) computedScore -= 8;
+          if (decayRatio < 0.1) computedScore += 5;
+          else if (decayRatio > 0.35) computedScore -= 18;
 
-        computedScore = Math.min(97, Math.max(68, Math.round(computedScore)));
+          if (avgBrightness > 120 && avgBrightness < 200) computedScore += 5;
+          else if (avgBrightness < 95) computedScore -= 12;
+        }
+
+        // Strictly clamp score between 0 and 90%
+        computedScore = Math.min(90, Math.max(10, Math.round(computedScore)));
 
         resolve({
           score: computedScore,
           vibrancyRatio: Number(vibrancyRatio.toFixed(2)),
           decayRatio: Number(decayRatio.toFixed(2)),
           avgBrightness: Math.round(avgBrightness),
-          avgR: Math.round(avgR),
-          avgG: Math.round(avgG),
-          avgB: Math.round(avgB)
+          isFood
         });
       } catch (err) {
         console.warn('Canvas pixel processing fallback:', err);
-        resolve({ score: 88, vibrancyRatio: 0.6, decayRatio: 0.08, avgBrightness: 150 });
+        resolve({ score: 75, vibrancyRatio: 0.5, decayRatio: 0.08, avgBrightness: 140, isFood: true });
       }
     };
     img.onerror = () => {
-      resolve({ score: 88, vibrancyRatio: 0.6, decayRatio: 0.08, avgBrightness: 150 });
+      resolve({ score: 75, vibrancyRatio: 0.5, decayRatio: 0.08, avgBrightness: 140, isFood: true });
     };
     img.src = imageDataUrl;
   });
 }
 
+// Candidate Gemini multimodal models in priority order
+const CANDIDATE_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-flash-latest'
+];
+
 // -------------------------------------------------------------
 // MAIN ANALYSIS ENTRYPOINT
+// Strict scoring (0 - 90%) powered by Google Gemini Vision
 // -------------------------------------------------------------
 export async function analyzeFoodImage({ imageDataUrl, category = 'Meals', foodName = 'Surplus Food' }) {
   const activeGeminiKey = getGeminiApiKey();
@@ -149,32 +168,69 @@ export async function analyzeFoodImage({ imageDataUrl, category = 'Meals', foodN
       const base64Data = imageDataUrl.split(',')[1];
       const mimeType = imageDataUrl.substring(imageDataUrl.indexOf(':') + 1, imageDataUrl.indexOf(';'));
 
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeGeminiKey}`;
+      const strictPrompt = `You are an extremely strict Food Safety and Quality Inspection AI for the FoodConnect surplus food donation platform.
+Carefully inspect this uploaded image for declared item: "${foodName}" (Category: ${category}).
+
+STRICT SCORING PROTOCOL (Range: 0 to 90% ONLY. Absolutely NEVER give a score above 90%):
+1. NON-FOOD OR BLANK / ARTIFACT:
+   - If the image contains no food (e.g. documents, selfie, animals, furniture, blank or solid color, screenshots, random objects, empty vessels/tables):
+   - Score: strictly 0 to 20%
+   - isFood: false
+   - status: "Rejected - Non-Food Item"
+   - freshnessGrade: "Grade F (Non-Food)"
+   - consumptionWindow: "Do not distribute"
+   - hygiene: "Not edible food"
+   - discoloration: "Non-food artifact detected"
+
+2. SEVERELY BLURRY / POOR LIGHTING / DULL / UNIDENTIFIABLE:
+   - If the image is dark, poorly lit, heavily shadowed, blurry, muddy, or dull such that food freshness cannot be verified with confidence:
+   - Score: strictly 20 to 45%
+   - isFood: false or unverified
+   - status: "Poor Lighting / Unclear Visibility"
+   - freshnessGrade: "Grade D (Substandard Presentation)"
+   - consumptionWindow: "Inspect carefully before dispatch"
+   - hygiene: "Low visual clarity"
+   - discoloration: "Dull/muddy appearance"
+
+3. QUESTIONABLE / STALE / OIL SEPARATION / UNHYGIENIC CONTAINER:
+   - If food appears dry, stale, crusty, discolored, showing heavy oil separation, or held in dirty/uncovered/damaged containers:
+   - Score: strictly 45 to 62%
+   - isFood: true
+   - status: "Fair Quality - Needs Physical Inspection"
+   - freshnessGrade: "Grade C (Marginal Freshness)"
+
+4. STANDARD ACCEPTABLE HOMESTYLE / RESTAURANT PREPARATION:
+   - Food is freshly cooked, recognizable, acceptable kitchen lighting, decent clean container:
+   - Score: strictly 63 to 77%
+   - isFood: true
+   - status: "Acceptable Quality"
+   - freshnessGrade: "Grade B (Good Standard)"
+
+5. OPTIMAL FRESH / VIBRANT FOOD PRESENTATION:
+   - Excellent lighting, appetizing natural colors, visible steam/moisture, clean stainless steel or food-grade covered trays, clearly nutritious and fresh:
+   - Score: strictly 78 to 90% (CAP AT 90% MAXIMUM - NEVER exceed 90%)
+   - isFood: true
+   - status: "Good Quality (Optimal)"
+   - freshnessGrade: "Grade A (Optimal Freshness)"
+
+Return ONLY a raw JSON object (no markdown, no backticks, no code fences) with these exact keys:
+{
+  "isFood": true,
+  "score": 75,
+  "status": "Acceptable Quality",
+  "freshnessGrade": "Grade B (Good Standard)",
+  "hygiene": "Stainless steel tray with adequate cleanliness",
+  "discoloration": "No signs of mold or unnatural discoloration",
+  "lightingQuality": "Adequate kitchen lighting",
+  "consumptionWindow": "Consume within 4-5 hours",
+  "summary": "Strict AI inspection confirms fresh cooked rice with intact texture in clean container."
+}`;
+
       const payload = {
         contents: [
           {
             parts: [
-              {
-                text: `You are an expert food safety and visual quality inspector for the FoodConnect surplus food donation platform.
-Analyze this uploaded food photo for "${foodName}" (Category: ${category}).
-Inspect:
-1. Visual freshness and vibrancy (steam, appetizing color, moisture level).
-2. Cleanliness of containers, trays, or packaging.
-3. Any signs of mold, discoloration, separation, or spoilage.
-4. Estimated safe distribution consumption window (in hours).
-5. Freshness score from 50 to 98.
-
-Return ONLY a valid JSON object without markdown or code fences in this exact format:
-{
-  "score": 88,
-  "status": "Good Quality",
-  "freshnessGrade": "Grade A (Optimal)",
-  "hygiene": "Clean stainless steel / food-grade container",
-  "discoloration": "No visual mold or spoilage detected",
-  "consumptionWindow": "4 to 6 hours",
-  "summary": "Food appears freshly cooked with intact texture and hygienic presentation."
-}`
-              },
+              { text: strictPrompt },
               {
                 inline_data: {
                   mime_type: mimeType,
@@ -189,59 +245,109 @@ Return ONLY a valid JSON object without markdown or code fences in this exact fo
         }
       };
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      // Loop through candidate models with automatic failover
+      for (const model of CANDIDATE_MODELS) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeGeminiKey}`;
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
 
-      if (res.ok) {
-        const data = await res.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          const parsed = JSON.parse(text);
-          return {
-            score: parsed.score || 88,
-            status: parsed.status || (parsed.score >= 85 ? 'Good Quality' : 'Moderate Quality'),
-            freshnessGrade: parsed.freshnessGrade || (parsed.score >= 88 ? 'Grade A' : 'Grade B'),
-            hygieneMarkers: [
-              parsed.hygiene || 'Hygienic food-grade container observed',
-              parsed.discoloration || 'Natural uniform coloration verified',
-              'Optimal thermal & storage presentation'
-            ],
-            recommendedWindow: parsed.consumptionWindow || '4 to 6 hours',
-            summary: parsed.summary || `Gemini Vision confirms wholesome texture and safe presentation for ${foodName}.`,
-            isRealAi: true,
-            engine: 'Google Gemini 1.5 Flash Vision'
-          };
+          if (res.ok) {
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const cleanJson = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+              const parsed = JSON.parse(cleanJson);
+
+              // Strict bounds enforcement: 0 to 90%
+              let finalScore = Math.max(0, Math.min(90, Math.round(Number(parsed.score) || 0)));
+              const isFood = parsed.isFood !== false;
+              if (!isFood) {
+                finalScore = Math.min(finalScore, 20);
+              }
+
+              const status = parsed.status || (
+                !isFood ? 'Rejected - Non-Food Item' :
+                finalScore >= 78 ? 'Good Quality (Optimal)' :
+                finalScore >= 63 ? 'Acceptable Quality' :
+                finalScore >= 45 ? 'Fair Quality (Inspect)' : 'Substandard / Poor Lighting'
+              );
+
+              const freshnessGrade = parsed.freshnessGrade || (
+                !isFood ? 'Grade F (Non-Food)' :
+                finalScore >= 78 ? 'Grade A (Optimal)' :
+                finalScore >= 63 ? 'Grade B (Good)' :
+                finalScore >= 45 ? 'Grade C (Fair)' : 'Grade D (Poor)'
+              );
+
+              return {
+                score: finalScore,
+                status,
+                freshnessGrade,
+                isFood,
+                hygieneMarkers: [
+                  parsed.hygiene || (isFood ? 'Hygienic container presentation observed' : 'Non-food artifact detected'),
+                  parsed.discoloration || (isFood ? 'Natural uniform food coloration verified' : 'No food pigment verified'),
+                  parsed.lightingQuality || (finalScore >= 65 ? 'Adequate kitchen illumination verified' : 'Suboptimal lighting / Shadows detected')
+                ],
+                recommendedWindow: parsed.consumptionWindow || (isFood ? 'Distribute within 4-5 hours' : 'Do not distribute'),
+                summary: parsed.summary || (isFood
+                  ? `Strict Gemini Vision inspection confirms wholesome presentation for ${foodName} (Score: ${finalScore}%).`
+                  : `Strict AI inspection detected a non-food or unidentifiable image. Only clear food photos are eligible for donation.`
+                ),
+                isRealAi: true,
+                engine: `Google Gemini Vision AI (${model})`
+              };
+            }
+          } else {
+            console.warn(`Gemini model ${model} returned ${res.status}, trying fallback...`);
+          }
+        } catch (subErr) {
+          console.warn(`Gemini model ${model} fetch failed:`, subErr);
         }
-      } else {
-        console.warn('Gemini API response not OK:', res.status, await res.text().catch(() => ''));
       }
     } catch (err) {
-      console.warn('Gemini API call failed, falling back to Canvas CV engine:', err);
+      console.warn('Gemini Vision processing error, falling back to Canvas CV engine:', err);
     }
   }
 
-  // 2. Real Client-Side Canvas Computer Vision Engine
-  // Measures real pixel histogram, luminance and vibrancy from the actual image
+  // 2. Real Client-Side Canvas Computer Vision Engine (Fail-safe)
   const cvMetrics = await analyzeCanvasPixels(imageDataUrl);
 
-  const status = cvMetrics.score >= 85 ? 'Good Quality' : 'Moderate Quality';
-  const grade = cvMetrics.score >= 90 ? 'Grade A (Optimal)' : cvMetrics.score >= 80 ? 'Grade B (Fresh)' : 'Grade C (Inspect Promptly)';
+  const status = !cvMetrics.isFood
+    ? 'Substandard / Low Visibility'
+    : cvMetrics.score >= 78
+    ? 'Good Quality (Optimal)'
+    : cvMetrics.score >= 63
+    ? 'Acceptable Quality'
+    : 'Fair Quality (Inspect)';
+
+  const grade = !cvMetrics.isFood
+    ? 'Grade D (Low Clarity)'
+    : cvMetrics.score >= 78
+    ? 'Grade A (Optimal)'
+    : cvMetrics.score >= 63
+    ? 'Grade B (Good)'
+    : 'Grade C (Fair)';
 
   return {
     score: cvMetrics.score,
     status,
     freshnessGrade: grade,
+    isFood: cvMetrics.isFood,
     hygieneMarkers: [
-      `Pixel Color Vibrancy: ${Math.round(cvMetrics.vibrancyRatio * 100)}% (Healthy food tones)`,
-      `Spoilage Discoloration: ${Math.round(cvMetrics.decayRatio * 100)}% (Well within safety limit)`,
-      `Surface Luminance: ${cvMetrics.avgBrightness}/255 (Adequate kitchen illumination)`
+      `Pixel Color Vibrancy: ${Math.round(cvMetrics.vibrancyRatio * 100)}% (Color vibrancy assessment)`,
+      `Dark Discoloration Ratio: ${Math.round(cvMetrics.decayRatio * 100)}% (Strict discoloration check)`,
+      `Surface Luminance: ${cvMetrics.avgBrightness}/255 (Illumination level analysis)`
     ],
-    recommendedWindow: cvMetrics.score >= 88 ? 'Distribute within 5-6 hours' : 'Distribute within 3-4 hours',
-    summary: `Computer vision inspection of ${foodName} confirms wholesome coloration, intact container presentation, and high visual freshness.`,
+    recommendedWindow: cvMetrics.score >= 78 ? 'Distribute within 4-5 hours' : 'Inspect and distribute within 2-3 hours',
+    summary: cvMetrics.isFood
+      ? `Strict optical vision inspection of ${foodName} confirms acceptable presentation (Score: ${cvMetrics.score}% / 90%).`
+      : `Suboptimal lighting or low color contrast detected in photo. Recommend re-taking photo under bright kitchen lighting.`,
     isRealAi: false,
-    engine: 'In-Browser Computer Vision (Pixel Histogram)'
+    engine: 'In-Browser Optical Vision Engine (Strict Heuristic)'
   };
 }

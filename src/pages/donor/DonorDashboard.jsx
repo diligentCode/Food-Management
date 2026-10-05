@@ -178,7 +178,7 @@ export default function DonorDashboard() {
                           ⏰ {item.pickupDeadline}
                         </span>
                         <span className="meta-pill pill-fresh">
-                          AI Freshness: {item.qualityScore || 88}/100
+                          ✨ AI Score: {item.qualityScore || 75}%
                         </span>
                       </div>
                     </div>

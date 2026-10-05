@@ -249,7 +249,7 @@ export default function NGODashboard() {
                                 Prepared: {item.preparedAt}
                               </span>
                               <span className="meta-pill pill-fresh">
-                                Freshness: {item.qualityScore || 88}/100
+                                ✨ AI Score: {item.qualityScore || 75}%
                               </span>
                             </div>
                           </div>

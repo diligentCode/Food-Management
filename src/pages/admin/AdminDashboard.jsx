@@ -198,7 +198,7 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td style={{ padding: '14px 18px', fontWeight: 700, color: '#15803d' }}>
-                        {item.qualityScore || 88}/100
+                        {item.qualityScore || 75}%
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         <button

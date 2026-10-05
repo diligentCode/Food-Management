@@ -141,7 +141,7 @@ export default function MyListingsPage() {
                         ⏰ Deadline: {item.pickupDeadline}
                       </span>
                       <span className="meta-pill pill-fresh">
-                        AI Score: {item.qualityScore || 88}/100
+                        ✨ AI Score: {item.qualityScore || 75}%
                       </span>
                     </div>
                   </div>

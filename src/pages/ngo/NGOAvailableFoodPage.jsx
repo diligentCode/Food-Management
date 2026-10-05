@@ -191,7 +191,7 @@ export default function NGOAvailableFoodPage() {
 
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
                         <span className="meta-pill pill-muted">⚖️ {food.quantity} {food.unit}</span>
-                        <span className="meta-pill pill-fresh">AI: {food.qualityScore || 88}/100</span>
+                        <span className="meta-pill pill-fresh">✨ AI: {food.qualityScore || 75}%</span>
                         {expired ? (
                           <span className="meta-pill pill-expiry">⚠️ Expired</span>
                         ) : (

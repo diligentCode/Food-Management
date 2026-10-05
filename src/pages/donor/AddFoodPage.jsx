@@ -90,6 +90,16 @@ export default function AddFoodPage() {
       return;
     }
 
+    // Strict AI Inspection Guard
+    if (aiAnalysis && aiAnalysis.isFood === false) {
+      setError('Strict AI Inspection Blocked: The uploaded photo was detected as non-food or an unidentifiable artifact. Please upload a clear photo of edible food to publish.');
+      return;
+    }
+    if (aiScore < 30) {
+      setError(`Strict AI Inspection Blocked: The photo scored ${aiScore}% / 90% (substandard/unclear). Please take a brighter, clearer photo under adequate lighting.`);
+      return;
+    }
+
     try {
       setSubmitting(true);
       const hours = Number(expiryHours) || 6;
@@ -116,7 +126,7 @@ export default function AddFoodPage() {
         listingType,
         price: listingType === 'paid' ? Number(price) : 0,
         qualityScore: aiScore,
-        qualityStatus: aiScore >= 85 ? 'Good Quality' : 'Moderate Quality',
+        qualityStatus: aiAnalysis?.status || (aiScore >= 78 ? 'Good Quality (Optimal)' : aiScore >= 63 ? 'Acceptable Quality' : 'Substandard / Low Quality'),
         qualityAnalysis: aiAnalysis
       });
 
