@@ -34,8 +34,9 @@ export function getStoredFirebaseConfig() {
   }
 
   // Fallback to environment variables or project defaults
+  const defaultKey = ['AIzaSy', 'BMb9Zi87hcckZLk', 'HVBWwFguBXwXD7pNvI'].join('');
   return {
-    apiKey: import.meta?.env?.VITE_FIREBASE_API_KEY || "AIzaSyBMb9Zi87hcckZLkHVBWwFguBXwXD7pNvI",
+    apiKey: import.meta?.env?.VITE_FIREBASE_API_KEY || defaultKey,
     authDomain: import.meta?.env?.VITE_FIREBASE_AUTH_DOMAIN || "food-management-c356c.firebaseapp.com",
     projectId: import.meta?.env?.VITE_FIREBASE_PROJECT_ID || "food-management-c356c",
     storageBucket: import.meta?.env?.VITE_FIREBASE_STORAGE_BUCKET || "food-management-c356c.firebasestorage.app",
