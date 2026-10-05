@@ -442,6 +442,116 @@ export const MUNICIPAL_CORPORATIONS_DIRECTORY = {
     centralFacility: 'Shivri Solid Waste & Organic Fertilizer Plant, Lucknow',
     website: 'https://lmc.up.nic.in'
   },
+  nagpur: {
+    name: 'Nagpur Municipal Corporation (NMC)',
+    helpline: '0712-2567035',
+    phoneClean: '+917122567035',
+    tollFree: '1800-233-3764',
+    email: 'contact@nmcnagpur.gov.in',
+    wasteDepartment: 'NMC Solid Waste Management & Health Department',
+    centralFacility: 'Bhandewadi Solid Waste Processing & Bio-Mining Plant, Nagpur',
+    website: 'https://www.nmcnagpur.gov.in'
+  },
+  indore: {
+    name: 'Indore Municipal Corporation (IMC)',
+    helpline: '0731-2535555',
+    phoneClean: '+917312535555',
+    tollFree: '1800-233-1313',
+    email: 'commissioner@indorecity.gov.in',
+    wasteDepartment: 'Solid Waste Management & 100% Segregation Division',
+    centralFacility: 'Devguradia Bio-CNG (Gobardhan) & Mechanized Composting Facility, Indore',
+    website: 'https://imcindore.mp.gov.in'
+  },
+  surat: {
+    name: 'Surat Municipal Corporation (SMC)',
+    helpline: '0261-2423751',
+    phoneClean: '+912612423751',
+    tollFree: '1800-123-8000',
+    email: 'info@suratmunicipal.gov.in',
+    wasteDepartment: 'Solid Waste Management Cell',
+    centralFacility: 'Bhatar & Khajod Solid Waste Processing & Bio-Energy Plant, Surat',
+    website: 'https://www.suratmunicipal.gov.in'
+  },
+  bhopal: {
+    name: 'Bhopal Municipal Corporation (BMC)',
+    helpline: '0755-2701000',
+    phoneClean: '+917552701000',
+    tollFree: '155304',
+    email: 'commissioner@bmconline.gov.in',
+    wasteDepartment: 'Health & Solid Waste Wing',
+    centralFacility: 'Adampur Chhawani Solid Waste & Bio-Methanation Facility, Bhopal',
+    website: 'https://www.bmconline.gov.in'
+  },
+  kanpur: {
+    name: 'Kanpur Nagar Nigam (KNN)',
+    helpline: '0512-2541258',
+    phoneClean: '+915122541258',
+    tollFree: '1800-180-5124',
+    email: 'kanpur_nagar_nigam@yahoo.co.in',
+    wasteDepartment: 'Environment & Solid Waste Division',
+    centralFacility: 'Panki Solid Waste Processing Plant, Kanpur',
+    website: 'https://kmc.up.nic.in'
+  },
+  varanasi: {
+    name: 'Varanasi Nagar Nigam (VNN)',
+    helpline: '1533',
+    phoneClean: '1533',
+    tollFree: '1800-180-5567',
+    email: 'nagarnigamvns@gmail.com',
+    wasteDepartment: 'Solid Waste & Sanitation Department',
+    centralFacility: 'Karsada Waste-to-Compost & Bio-Energy Plant, Varanasi',
+    website: 'https://nnvns.org.in'
+  },
+  patna: {
+    name: 'Patna Municipal Corporation (PMC)',
+    helpline: '155304',
+    phoneClean: '155304',
+    tollFree: '1800-345-6644',
+    email: 'patnamunicipalcorporation@gmail.com',
+    wasteDepartment: 'Sanitation & Solid Waste Cell',
+    centralFacility: 'Ramachandrapur Waste Processing & Composting Facility, Patna',
+    website: 'https://pmc.bihar.gov.in'
+  },
+  visakhapatnam: {
+    name: 'Greater Visakhapatnam Municipal Corporation (GVMC)',
+    helpline: '1800-425-00009',
+    phoneClean: '180042500009',
+    tollFree: '1800-425-00009',
+    email: 'commissioner_gvmc@yahoo.co.in',
+    wasteDepartment: 'Public Health & Solid Waste Management',
+    centralFacility: 'Kapuluppada Waste-to-Energy & Scientific Compost Plant, Visakhapatnam',
+    website: 'https://gvmc.gov.in'
+  },
+  vadodara: {
+    name: 'Vadodara Municipal Corporation (VMC)',
+    helpline: '1800-233-0266',
+    phoneClean: '18002330266',
+    tollFree: '1800-233-0266',
+    email: 'vmc@vmc.gov.in',
+    wasteDepartment: 'Solid Waste Management Department',
+    centralFacility: 'Atladara Organic Fertilizer & Biogas Plant, Vadodara',
+    website: 'https://vmc.gov.in'
+  },
+  nashik: {
+    name: 'Nashik Municipal Corporation (NMC)',
+    helpline: '0253-2575631',
+    phoneClean: '+912532575631',
+    tollFree: '1800-233-9111',
+    email: 'contact@nmc.gov.in',
+    wasteDepartment: 'Solid Waste Management Cell',
+    centralFacility: 'Pathardi Solid Waste Processing & Compost Facility, Nashik',
+    website: 'https://nmc.gov.in'
+  },
+  coimbatore: {
+    name: 'Coimbatore City Municipal Corporation (CCMC)',
+    helpline: '0422-2302323',
+    phoneClean: '+914222302323',
+    tollFree: '1800-425-4141',
+    email: 'commr.coimbatore@tn.gov.in',
+    wasteDepartment: 'Solid Waste Management Department',
+    centralFacility: 'Vellalore Solid Waste Management Facility, Coimbatore',
+    website: 'https://ccmc.gov.in'
+  },
   chandigarh: {
     name: 'Municipal Corporation Chandigarh (MCC)',
     helpline: '0172-2787200',

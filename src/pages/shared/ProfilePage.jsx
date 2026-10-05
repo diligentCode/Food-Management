@@ -175,7 +175,7 @@ export default function ProfilePage() {
 
                 {/* Popular city badges */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                  {['Jaipur', 'Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Pune', 'Ahmedabad', 'Kolkata', 'Lucknow'].map((quickCity) => (
+                  {['Nagpur', 'Indore', 'Jaipur', 'Delhi', 'Mumbai', 'Bengaluru', 'Hyderabad', 'Pune', 'Ahmedabad', 'Kolkata', 'Lucknow'].map((quickCity) => (
                     <button
                       key={quickCity}
                       type="button"

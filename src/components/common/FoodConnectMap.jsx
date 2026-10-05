@@ -1,7 +1,25 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { calculateDistanceKm } from '../../services/dataService';
+
+// Tile provider definitions (Google Maps high-fidelity roadmap & satellite hybrid)
+const MAP_LAYERS = {
+  roadmap: {
+    name: 'Google Maps',
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+    attribution: '&copy; Google Maps'
+  },
+  satellite: {
+    name: 'Satellite',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    subdomains: ['0', '1', '2', '3'],
+    maxZoom: 20,
+    attribution: '&copy; Google Maps Satellite'
+  }
+};
 
 // Custom SVG Pin Icon for route maps
 const createMapPin = (symbol, label, color) => {
@@ -55,6 +73,8 @@ export default function FoodConnectMap({
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const tileLayerRef = useRef(null);
+  const [activeLayer, setActiveLayer] = useState('roadmap');
 
   const donorLat = donorLocation?.lat || 26.8520;
   const donorLng = donorLocation?.lng || 75.8050;
@@ -82,11 +102,15 @@ export default function FoodConnectMap({
       scrollWheelZoom: false
     });
 
-    // Street tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
+    // Google Maps Roadmap tiles showing real restaurants, buildings, landmarks, and streets
+    const cfg = MAP_LAYERS.roadmap;
+    const tileLayer = L.tileLayer(cfg.url, {
+      subdomains: cfg.subdomains,
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom
     }).addTo(map);
+
+    tileLayerRef.current = tileLayer;
 
     // Donor Marker (Hotel / Food Source)
     const donorMarker = L.marker([donorLat, donorLng], {
@@ -114,7 +138,7 @@ export default function FoodConnectMap({
 
     // Route Polyline (Green dashed line connecting donor and NGO)
     if (showRoute) {
-      const routeLine = L.polyline(
+      L.polyline(
         [
           [donorLat, donorLng],
           [ngoLat, ngoLng]
@@ -139,6 +163,24 @@ export default function FoodConnectMap({
     };
   }, [donorLat, donorLng, ngoLat, ngoLng]);
 
+  const switchLayer = (layerKey) => {
+    if (!mapInstanceRef.current || !MAP_LAYERS[layerKey]) return;
+    setActiveLayer(layerKey);
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+
+    const cfg = MAP_LAYERS[layerKey];
+    const newTileLayer = L.tileLayer(cfg.url, {
+      subdomains: cfg.subdomains,
+      attribution: cfg.attribution,
+      maxZoom: cfg.maxZoom
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newTileLayer;
+  };
+
   return (
     <div style={{
       width: '100%',
@@ -146,10 +188,10 @@ export default function FoodConnectMap({
       borderRadius: '16px',
       overflow: 'hidden',
       position: 'relative',
-      border: '1px solid var(--color-border)',
+      border: '1.5px solid var(--color-border)',
       boxShadow: 'var(--shadow-sm)'
     }}>
-      {/* Real Interactive Leaflet Map */}
+      {/* Interactive Leaflet Map with Google Maps Tiles */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Floating Info Overlay Badge */}
@@ -177,6 +219,57 @@ export default function FoodConnectMap({
             Estimated vehicle transit: ~{estMinutes} mins
           </div>
         </div>
+      </div>
+
+      {/* Layer Switcher Controls Floating Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: '16px',
+        right: '16px',
+        zIndex: 500,
+        display: 'flex',
+        background: 'rgba(255, 255, 255, 0.94)',
+        backdropFilter: 'blur(6px)',
+        borderRadius: '8px',
+        padding: '3px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+        border: '1px solid #cbd5e1',
+        gap: '2px'
+      }}>
+        <button
+          type="button"
+          onClick={() => switchLayer('roadmap')}
+          style={{
+            padding: '4px 8px',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            borderRadius: '6px',
+            border: 'none',
+            background: activeLayer === 'roadmap' ? 'var(--color-primary-dark)' : 'transparent',
+            color: activeLayer === 'roadmap' ? '#ffffff' : '#334155',
+            cursor: 'pointer'
+          }}
+          title="Google Maps Roadmap (Shows all shops, restaurants & buildings)"
+        >
+          🗺️ Google Maps
+        </button>
+        <button
+          type="button"
+          onClick={() => switchLayer('satellite')}
+          style={{
+            padding: '4px 8px',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            borderRadius: '6px',
+            border: 'none',
+            background: activeLayer === 'satellite' ? 'var(--color-primary-dark)' : 'transparent',
+            color: activeLayer === 'satellite' ? '#ffffff' : '#334155',
+            cursor: 'pointer'
+          }}
+          title="Satellite Photography with Street Labels"
+        >
+          🛰️ Satellite
+        </button>
       </div>
 
       {/* Direct Google Maps Directions Navigation Button */}

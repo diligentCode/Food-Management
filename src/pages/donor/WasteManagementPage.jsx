@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { wasteService, foodService, getMunicipalContactForCity, MUNICIPAL_CORPORATIONS_DIRECTORY } from '../../services/dataService';
+import { wasteService, foodService, getMunicipalContactForCity, ALL_INDIAN_CITIES } from '../../services/dataService';
 
 export default function WasteManagementPage() {
   const { currentUser } = useAuth();
@@ -161,27 +161,57 @@ export default function WasteManagementPage() {
                 </p>
               </div>
 
-              {/* City Switcher */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Municipal Region:</span>
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#ffffff', fontWeight: 600 }}
-                >
-                  <option value="Jaipur">Jaipur (Nagar Nigam)</option>
-                  <option value="New Delhi">New Delhi (MCD)</option>
-                  <option value="Mumbai">Mumbai (BMC)</option>
-                  <option value="Bengaluru">Bengaluru (BBMP)</option>
-                  <option value="Hyderabad">Hyderabad (GHMC)</option>
-                  <option value="Chennai">Chennai (GCC)</option>
-                  <option value="Pune">Pune (PMC)</option>
-                  <option value="Ahmedabad">Ahmedabad (AMC)</option>
-                  <option value="Kolkata">Kolkata (KMC)</option>
-                  <option value="Lucknow">Lucknow (LMC)</option>
-                  <option value="Chandigarh">Chandigarh (MCC)</option>
-                  <option value="National">National (Swachh Bharat 1969)</option>
-                </select>
+              {/* City Switcher with 150+ Indian Municipal Regions */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>🏛️ Municipal Region:</span>
+                  <input
+                    type="text"
+                    list="waste-municipal-cities-list"
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    placeholder="Search city / municipality..."
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1.5px solid #cbd5e1',
+                      fontSize: '0.86rem',
+                      backgroundColor: '#ffffff',
+                      fontWeight: 700,
+                      width: '220px'
+                    }}
+                  />
+                  <datalist id="waste-municipal-cities-list">
+                    {ALL_INDIAN_CITIES.map((c, idx) => (
+                      <option key={`waste-c-${idx}`} value={c.name}>
+                        {c.name}, {c.state} (Municipal Zone)
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+
+                {/* Popular city badges including Nagpur */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end', maxWidth: '420px' }}>
+                  {['Nagpur', 'Indore', 'Jaipur', 'Mumbai', 'Delhi', 'Bengaluru', 'Pune', 'Hyderabad', 'Ahmedabad', 'Kolkata'].map((quickCity) => (
+                    <button
+                      key={quickCity}
+                      type="button"
+                      onClick={() => setSelectedCity(quickCity)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.7rem',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        background: selectedCity.toLowerCase() === quickCity.toLowerCase() ? 'var(--color-primary-dark)' : '#f8fafc',
+                        color: selectedCity.toLowerCase() === quickCity.toLowerCase() ? '#ffffff' : '#475569',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      {quickCity}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
