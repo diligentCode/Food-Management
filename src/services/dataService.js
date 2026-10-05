@@ -780,6 +780,49 @@ export const foodService = {
     if (isCloudFirebaseActive() && db) {
       deleteDoc(doc(db, 'foodListings', id)).catch(e => console.warn('Firestore listing delete:', e));
     }
+
+    // Synchronize associated donation records:
+    let donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
+    let donationsChanged = false;
+
+    donations = donations.filter(d => {
+      if (d.foodListingId !== id) return true;
+
+      const isPickedUp = d.otpVerified || d.status === 'picked_up' || d.status === 'delivered';
+      if (!isPickedUp) {
+        // Deleted BEFORE OTP is verified / picked up:
+        // Must disappear from track my order from BOTH sides!
+        donationsChanged = true;
+        if (isCloudFirebaseActive() && db) {
+          deleteDoc(doc(db, 'donations', d.id)).catch(e => console.warn('Firestore delete:', e));
+        }
+        notificationService.createNotification({
+          userId: d.ngoId,
+          title: 'Order Cancelled Before Pickup',
+          message: `${d.donorName} has deleted the listing for ${d.foodName} before pickup.`,
+          type: 'order_cancelled',
+          relatedId: d.id
+        });
+        return false; // Remove donation from storage
+      } else {
+        // Once it is picked up, donor deleting it doesn't affect receiver!
+        // Receiver will still see it on their dashboard
+        d.donorDeleted = true;
+        donationsChanged = true;
+        if (isCloudFirebaseActive() && db) {
+          updateDoc(doc(db, 'donations', d.id), { donorDeleted: true }).catch(e => console.warn('Firestore update:', e));
+        }
+        return true; // Keep for receiver
+      }
+    });
+
+    if (donationsChanged) {
+      saveStorage(STORAGE_KEYS.DONATIONS, donations);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('foodconnect_data_updated'));
+    }
     return true;
   }
 };
@@ -810,11 +853,70 @@ export const donationService = {
   getUserDonations(userId, role) {
     const donations = this.getDonations();
     if (role === 'donor') {
-      return donations.filter(d => d.donorId === userId);
+      // Donors do not see donations that they have deleted
+      return donations.filter(d => d.donorId === userId && !d.donorDeleted);
     } else if (role === 'ngo') {
+      // Receiver NGO always sees their distributions (even if donor deleted them post-pickup)
       return donations.filter(d => d.ngoId === userId);
     }
     return donations;
+  },
+  deleteDonation(donationId) {
+    let donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
+    const donation = donations.find(d => d.id === donationId);
+    if (!donation) return false;
+
+    const isPickedUp = donation.otpVerified || donation.status === 'picked_up' || donation.status === 'delivered';
+
+    if (!isPickedUp) {
+      // Deleted BEFORE OTP is verified / picked up:
+      // Must disappear from track my order from BOTH sides!
+      donations = donations.filter(d => d.id !== donationId);
+      saveStorage(STORAGE_KEYS.DONATIONS, donations);
+
+      // If associated food listing exists, remove it as well
+      if (donation.foodListingId) {
+        let listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
+        listings = listings.filter(l => l.id !== donation.foodListingId);
+        saveStorage(STORAGE_KEYS.LISTINGS, listings);
+
+        if (isCloudFirebaseActive() && db) {
+          deleteDoc(doc(db, 'foodListings', donation.foodListingId)).catch(e => console.warn('Firestore delete listing:', e));
+        }
+      }
+
+      if (isCloudFirebaseActive() && db) {
+        deleteDoc(doc(db, 'donations', donationId)).catch(e => console.warn('Firestore delete donation:', e));
+      }
+
+      // Notify the NGO
+      notificationService.createNotification({
+        userId: donation.ngoId,
+        title: 'Order Cancelled Before Pickup',
+        message: `${donation.donorName} has cancelled the order for ${donation.foodName} before pickup.`,
+        type: 'order_cancelled',
+        relatedId: donation.id
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('foodconnect_data_updated'));
+      }
+      return true;
+    } else {
+      // Once picked up: receiver will STILL see it on their dashboard!
+      // Donor deleting only hides it from donor's dashboard
+      donation.donorDeleted = true;
+      saveStorage(STORAGE_KEYS.DONATIONS, donations);
+
+      if (isCloudFirebaseActive() && db) {
+        updateDoc(doc(db, 'donations', donationId), { donorDeleted: true }).catch(e => console.warn('Firestore update:', e));
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('foodconnect_data_updated'));
+      }
+      return true;
+    }
   },
   acceptDonation(foodListingId, ngoUser, paymentDetails = null) {
     const listing = foodService.getListingById(foodListingId);

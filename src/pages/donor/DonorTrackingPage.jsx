@@ -15,8 +15,15 @@ export default function DonorTrackingPage() {
     if (currentUser) {
       const list = donationService.getUserDonations(currentUser.id, 'donor');
       setDonations(list);
-      if (list.length > 0 && !selectedDonation) {
-        setSelectedDonation(list[0]);
+      if (list.length > 0) {
+        if (!selectedDonation || !list.some(d => d.id === selectedDonation.id)) {
+          setSelectedDonation(list[0]);
+        } else {
+          const refreshed = list.find(d => d.id === selectedDonation.id);
+          if (refreshed) setSelectedDonation(refreshed);
+        }
+      } else {
+        setSelectedDonation(null);
       }
     }
   };
@@ -30,6 +37,20 @@ export default function DonorTrackingPage() {
       clearInterval(interval);
     };
   }, [currentUser]);
+
+  const handleDeleteOrder = (donation) => {
+    if (!donation) return;
+    const isPickedUp = donation.otpVerified || donation.status === 'picked_up' || donation.status === 'delivered';
+    const confirmMsg = isPickedUp
+      ? `Are you sure you want to remove ${donation.foodName} from your tracking list? (The receiver NGO will still retain it to complete distribution).`
+      : `Are you sure you want to cancel and delete the order for ${donation.foodName}? Since OTP has not been verified yet, this order will be completely cancelled and disappear from tracking on both sides.`;
+
+    if (window.confirm(confirmMsg)) {
+      donationService.deleteDonation(donation.id);
+      setSelectedDonation(null);
+      loadDonations();
+    }
+  };
 
   const handleAdvanceStatus = (nextStatus) => {
     if (!selectedDonation) return;
@@ -98,7 +119,46 @@ export default function DonorTrackingPage() {
 
               {/* Right Column: Timeline & Map */}
               {selectedDonation && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Order Header & Cancel/Delete Action */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: '#ffffff',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--color-border)',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
+                        {selectedDonation.foodName} ({selectedDonation.quantity})
+                      </h2>
+                      <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
+                        Assigned to: <strong>{selectedDonation.ngoName}</strong> &bull; Pickup: {selectedDonation.pickupAddress}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteOrder(selectedDonation)}
+                      className="btn btn-secondary btn-sm"
+                      style={{
+                        color: '#dc2626',
+                        borderColor: '#fca5a5',
+                        background: '#fff5f5',
+                        fontSize: '0.8rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      {selectedDonation.otpVerified || selectedDonation.status === 'picked_up' || selectedDonation.status === 'delivered'
+                        ? '🗑️ Remove from Tracking'
+                        : '✕ Cancel & Delete Order (Before Pickup)'}
+                    </button>
+                  </div>
+
                   {/* Status Timeline (Read-only for Donor - NGO manages dispatch) */}
                   <DonationTimeline
                     currentStatus={selectedDonation.status}

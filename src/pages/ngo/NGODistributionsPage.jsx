@@ -20,12 +20,14 @@ export default function NGODistributionsPage() {
       const list = donationService.getUserDonations(currentUser.id, 'ngo');
       setDonations(list);
       if (list.length > 0) {
-        if (!selectedDonation) {
+        if (!selectedDonation || !list.some(d => d.id === selectedDonation.id)) {
           setSelectedDonation(list[0]);
         } else {
           const refreshed = list.find(d => d.id === selectedDonation.id);
-          if (refreshed) setSelectedDonation(refreshed);
+          setSelectedDonation(refreshed || list[0]);
         }
+      } else {
+        setSelectedDonation(null);
       }
     }
   };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
-import { wasteService, foodService, getMunicipalContactForCity, ALL_INDIAN_CITIES } from '../../services/dataService';
+import { wasteService, foodService, donationService, getMunicipalContactForCity, ALL_INDIAN_CITIES } from '../../services/dataService';
 
 export default function WasteManagementPage() {
   const { currentUser } = useAuth();
@@ -23,9 +23,9 @@ export default function WasteManagementPage() {
       setRequests(wasteService.getDonorRequests(currentUser.id));
       const allListings = foodService.getDonorListings(currentUser.id);
       
-      // Filter: Only food items that are not yet delivered and not out for delivery
-      // Delivered, in-transit, or NGO-claimed batches must never appear in waste management
-      const EXCLUDED_STATUSES = ['delivered', 'completed', 'picked_up', 'in_transit', 'pickup_started', 'accepted'];
+      // Food remains available for waste management UNTIL OTP is verified and food is physically collected!
+      // It does NOT disappear when an order is accepted. Only once picked up (OTP verified) or delivered is it excluded.
+      const EXCLUDED_STATUSES = ['picked_up', 'in_transit', 'delivered', 'completed'];
       const eligibleListings = allListings.filter(item => !EXCLUDED_STATUSES.includes(item.status));
       setDonorListings(eligibleListings);
     }
@@ -34,6 +34,12 @@ export default function WasteManagementPage() {
   useEffect(() => {
     loadData();
     if (currentUser?.city) setSelectedCity(currentUser.city);
+    window.addEventListener('foodconnect_data_updated', loadData);
+    const interval = setInterval(loadData, 3000);
+    return () => {
+      window.removeEventListener('foodconnect_data_updated', loadData);
+      clearInterval(interval);
+    };
   }, [currentUser]);
 
   // Real official municipal contact for the user's city
@@ -62,6 +68,13 @@ export default function WasteManagementPage() {
 
       // Update listing status so it is no longer available for donation
       foodService.updateListing(listing.id, { status: 'waste_collection_requested' });
+
+      // If an unpicked donation was pending for this listing, cancel it so it's removed from tracking
+      const donations = donationService.getDonations();
+      const unpicked = donations.find(d => d.foodListingId === listing.id && !d.otpVerified && d.status !== 'picked_up' && d.status !== 'delivered');
+      if (unpicked) {
+        donationService.deleteDonation(unpicked.id);
+      }
 
       setSuccessTicket(newTicket);
       loadData();
@@ -269,7 +282,7 @@ export default function WasteManagementPage() {
                   Eligible Surplus Food Batches ({donorListings.length})
                 </h3>
                 <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
-                  Only food items that have not yet been delivered or are not out for delivery appear here. Delivered or in-transit donations are excluded from municipal waste processing.
+                  Food batches remain eligible for municipal waste diversion until OTP is verified at your kitchen dispatch gate. Once collected or delivered to beneficiaries, batches are safely excluded.
                 </p>
               </div>
 
@@ -318,7 +331,7 @@ export default function WasteManagementPage() {
                 <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>🌱</div>
                 <strong style={{ color: '#0f172a', fontSize: '1.05rem' }}>No Food Batches Requiring Waste Collection</strong>
                 <p style={{ fontSize: '0.84rem', marginTop: '4px', maxWidth: '520px', margin: '6px auto 0 auto' }}>
-                  All your active surplus donations are either safely delivered to beneficiaries, currently in transit, or no expired food batches require municipal pickup.
+                  All your active surplus donations have been safely verified with OTP and collected by NGOs, or no unpicked batches currently require municipal diversion.
                 </p>
               </div>
             ) : (
@@ -326,6 +339,7 @@ export default function WasteManagementPage() {
                 {donorListings.map((item) => {
                   const isWasteTicketed = item.status === 'waste_collection_requested';
                   const isExpired = item.status === 'expired';
+                  const isAccepted = item.status === 'accepted' || item.status === 'pickup_started';
 
                   return (
                     <div
@@ -334,8 +348,8 @@ export default function WasteManagementPage() {
                         padding: '16px 20px',
                         borderRadius: '12px',
                         border: '1.5px solid',
-                        borderColor: isWasteTicketed ? '#10b981' : isExpired ? '#fca5a5' : '#e2e8f0',
-                        backgroundColor: isWasteTicketed ? '#f0fdf4' : isExpired ? '#fff5f5' : '#ffffff',
+                        borderColor: isWasteTicketed ? '#10b981' : isExpired ? '#fca5a5' : isAccepted ? '#fde68a' : '#e2e8f0',
+                        backgroundColor: isWasteTicketed ? '#f0fdf4' : isExpired ? '#fff5f5' : isAccepted ? '#fefce8' : '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -344,8 +358,8 @@ export default function WasteManagementPage() {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: isExpired ? '#fee2e2' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', flexShrink: 0 }}>
-                          {isExpired ? '⚠️' : '🍲'}
+                        <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: isExpired ? '#fee2e2' : isAccepted ? '#fef3c7' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', flexShrink: 0 }}>
+                          {isExpired ? '⚠️' : isAccepted ? '⏳' : '🍲'}
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -355,10 +369,10 @@ export default function WasteManagementPage() {
                               padding: '2px 8px',
                               borderRadius: '4px',
                               fontWeight: 700,
-                              backgroundColor: isWasteTicketed ? '#dcfce7' : isExpired ? '#fee2e2' : '#e2e8f0',
-                              color: isWasteTicketed ? '#15803d' : isExpired ? '#b91c1c' : '#475569'
+                              backgroundColor: isWasteTicketed ? '#dcfce7' : isExpired ? '#fee2e2' : isAccepted ? '#fef3c7' : '#e2e8f0',
+                              color: isWasteTicketed ? '#15803d' : isExpired ? '#b91c1c' : isAccepted ? '#92400e' : '#475569'
                             }}>
-                              {isWasteTicketed ? 'WASTE PICKUP SCHEDULED' : isExpired ? 'EXPIRED' : item.status.toUpperCase()}
+                              {isWasteTicketed ? 'WASTE PICKUP SCHEDULED' : isExpired ? 'EXPIRED' : isAccepted ? 'ACCEPTED (PRE-PICKUP)' : item.status.toUpperCase()}
                             </span>
                           </div>
                           <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '3px' }}>
