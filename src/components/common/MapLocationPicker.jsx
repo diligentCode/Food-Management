@@ -169,7 +169,10 @@ export default function MapLocationPicker({
 
   // Live Location Search via OpenStreetMap
   const handleSearch = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!searchQuery.trim()) return;
 
     setSearching(true);
@@ -238,11 +241,18 @@ export default function MapLocationPicker({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
       {/* Search & Actions Bar */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <form onSubmit={handleSearch} style={{ display: 'flex', flex: 1, minWidth: '220px', gap: '6px' }}>
+        <div style={{ display: 'flex', flex: 1, minWidth: '220px', gap: '6px' }}>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSearch(e);
+              }
+            }}
             placeholder="Search locality, street, or landmark..."
             style={{
               flex: 1,
@@ -253,14 +263,19 @@ export default function MapLocationPicker({
             }}
           />
           <button
-            type="submit"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSearch(e);
+            }}
             disabled={searching}
             className="btn btn-secondary btn-sm"
             style={{ fontSize: '0.82rem', padding: '8px 12px' }}
           >
             {searching ? 'Searching...' : '🔍 Search'}
           </button>
-        </form>
+        </div>
 
         <button
           type="button"

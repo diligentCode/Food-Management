@@ -675,7 +675,19 @@ export const foodService = {
 // -------------------------------------------------------------
 export const donationService = {
   getDonations() {
-    return loadStorage(STORAGE_KEYS.DONATIONS, []);
+    const list = loadStorage(STORAGE_KEYS.DONATIONS, []);
+    let modified = false;
+    list.forEach(d => {
+      if (!d.handoverOtp) {
+        d.handoverOtp = Math.floor(1000 + Math.random() * 9000).toString();
+        d.otpVerified = d.status === 'picked_up' || d.status === 'delivered';
+        modified = true;
+      }
+    });
+    if (modified) {
+      saveStorage(STORAGE_KEYS.DONATIONS, list);
+    }
+    return list;
   },
   getDonationById(id) {
     const donations = this.getDonations();
@@ -706,7 +718,10 @@ export const donationService = {
     // 1. Mark listing as accepted
     foodService.updateListing(foodListingId, { status: 'accepted' });
 
-    // 2. Create donation record
+    // 2. Generate 4-digit security handover OTP for donor
+    const handoverOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    // 3. Create donation record
     const donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
     const newDonation = {
       id: 'donation_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -738,6 +753,8 @@ export const donationService = {
       paymentStatus: paymentDetails?.status || (listing.listingType === 'paid' ? 'pending' : 'completed'),
       transactionRef: paymentDetails?.transactionRef || null,
       status: 'accepted',
+      handoverOtp,
+      otpVerified: false,
       acceptedAt: new Date().toISOString(),
       pickupStartedAt: null,
       pickedUpAt: null,
@@ -753,19 +770,38 @@ export const donationService = {
       setDoc(doc(db, 'donations', newDonation.id), newDonation).catch(e => console.warn('Firestore donation sync:', e));
     }
 
-    // Notify Donor
+    // Notify Donor with the Handover Security OTP
     notificationService.createNotification({
       userId: listing.donorId,
       title: 'Donation Accepted!',
-      message: `${newDonation.ngoName} has accepted your listing: ${listing.foodName}.${listing.listingType === 'paid' ? ` (${newDonation.paymentMethod === 'direct_upi' ? 'Paid via UPI' : 'Payment at pickup'})` : ''}`,
+      message: `${newDonation.ngoName} has accepted ${listing.foodName}. Your Handover Security PIN is [${handoverOtp}]. Share this PIN with the NGO delivery team at your kitchen gate.`,
       type: 'donation_accepted',
       relatedId: newDonation.id
     });
 
     return newDonation;
   },
+  verifyOtpAndPickup(donationId, inputOtp) {
+    const donations = this.getDonations();
+    const donation = donations.find(d => d.id === donationId);
+    if (!donation) throw new Error('Donation record not found.');
+
+    const cleanInput = String(inputOtp || '').trim();
+    const expectedOtp = String(donation.handoverOtp || '').trim();
+
+    if (!cleanInput) {
+      throw new Error('Please enter the 4-digit Handover Security PIN provided by the donor.');
+    }
+
+    if (cleanInput !== expectedOtp) {
+      throw new Error(`Invalid Handover PIN "${cleanInput}". Please ask the donor kitchen manager for the correct 4-digit PIN.`);
+    }
+
+    donation.otpVerified = true;
+    return this.updateStatus(donationId, 'picked_up');
+  },
   updateStatus(donationId, nextStatus) {
-    const donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
+    const donations = this.getDonations();
     const donation = donations.find(d => d.id === donationId);
     if (!donation) throw new Error('Donation not found');
 
@@ -773,7 +809,10 @@ export const donationService = {
     const now = new Date().toISOString();
 
     if (nextStatus === 'pickup_started') donation.pickupStartedAt = now;
-    if (nextStatus === 'picked_up') donation.pickedUpAt = now;
+    if (nextStatus === 'picked_up') {
+      donation.pickedUpAt = now;
+      donation.otpVerified = true;
+    }
     if (nextStatus === 'delivered') donation.deliveredAt = now;
     donation.updatedAt = now;
 
@@ -789,14 +828,16 @@ export const donationService = {
 
     // Notify Donor
     const statusTitles = {
-      pickup_started: 'Pickup Has Started',
-      picked_up: 'Food Picked Up Successfully',
+      pickup_started: 'Pickup Vehicle En Route',
+      picked_up: 'Food Handover Verified & Collected',
       delivered: 'Donation Delivered to Beneficiaries'
     };
     notificationService.createNotification({
       userId: donation.donorId,
       title: statusTitles[nextStatus] || 'Donation Status Updated',
-      message: `Status of ${donation.foodName} is now: ${nextStatus.replace('_', ' ').toUpperCase()}`,
+      message: nextStatus === 'picked_up'
+        ? `Handover verified with PIN. ${donation.ngoName} has collected the food and is en route to distribution point.`
+        : `Status of ${donation.foodName} is now: ${nextStatus.replace('_', ' ').toUpperCase()}`,
       type: 'status_update',
       relatedId: donation.id
     });

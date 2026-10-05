@@ -99,12 +99,76 @@ export default function DonorTrackingPage() {
               {/* Right Column: Timeline & Map */}
               {selectedDonation && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* Status Timeline */}
+                  {/* Status Timeline (Read-only for Donor - NGO manages dispatch) */}
                   <DonationTimeline
                     currentStatus={selectedDonation.status}
-                    canAdvance={true}
-                    onAdvanceStatus={handleAdvanceStatus}
+                    canAdvance={false}
                   />
+
+                  {/* Kitchen Handover Security PIN Card */}
+                  {selectedDonation.status === 'accepted' || selectedDonation.status === 'pickup_started' ? (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)',
+                      color: '#ffffff',
+                      borderRadius: '16px',
+                      padding: '24px 28px',
+                      boxShadow: '0 10px 25px rgba(6, 78, 59, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '18px'
+                    }}>
+                      <div style={{ maxWidth: '420px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '1.5rem' }}>🔐</span>
+                          <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>
+                            Kitchen Handover Security PIN
+                          </h3>
+                        </div>
+                        <p style={{ margin: '8px 0 0 0', fontSize: '0.88rem', opacity: 0.92, lineHeight: 1.4 }}>
+                          When the NGO collection team arrives at your kitchen dispatch gate, ask them for proof of collection and share this 4-digit PIN to authorize pickup.
+                        </p>
+                      </div>
+
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        backdropFilter: 'blur(8px)',
+                        border: '2px dashed rgba(255, 255, 255, 0.55)',
+                        borderRadius: '14px',
+                        padding: '14px 30px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '1.5px', opacity: 0.85, fontWeight: 700 }}>
+                          HANDOVER OTP
+                        </div>
+                        <div style={{ fontSize: '2.4rem', fontWeight: 900, letterSpacing: '8px', fontFamily: 'monospace' }}>
+                          {selectedDonation.handoverOtp || '----'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      border: '1.5px solid #86efac',
+                      borderRadius: '14px',
+                      padding: '16px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      color: '#15803d'
+                    }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#22c55e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', fontWeight: 800 }}>
+                        ✓
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '0.98rem' }}>Handover Successfully Verified via OTP</strong>
+                        <div style={{ fontSize: '0.84rem', color: '#166534', marginTop: '2px' }}>
+                          Surplus food was verified and collected by <strong>{selectedDonation.ngoName}</strong>. Distribution is underway!
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Visual Map Component */}
                   <div className="card">

@@ -11,12 +11,21 @@ export default function NGODistributionsPage() {
   const [donations, setDonations] = useState([]);
   const [selectedDonation, setSelectedDonation] = useState(null);
 
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
+
   const loadDonations = () => {
     if (currentUser) {
       const list = donationService.getUserDonations(currentUser.id, 'ngo');
       setDonations(list);
-      if (list.length > 0 && !selectedDonation) {
-        setSelectedDonation(list[0]);
+      if (list.length > 0) {
+        if (!selectedDonation) {
+          setSelectedDonation(list[0]);
+        } else {
+          const refreshed = list.find(d => d.id === selectedDonation.id);
+          if (refreshed) setSelectedDonation(refreshed);
+        }
       }
     }
   };
@@ -33,9 +42,28 @@ export default function NGODistributionsPage() {
 
   const handleAdvanceStatus = (nextStatus) => {
     if (!selectedDonation) return;
+    setOtpError('');
+    setOtpSuccess('');
     const updated = donationService.updateStatus(selectedDonation.id, nextStatus);
     setSelectedDonation(updated);
     loadDonations();
+  };
+
+  const handleVerifyOtp = (e) => {
+    e.preventDefault();
+    if (!selectedDonation) return;
+    setOtpError('');
+    setOtpSuccess('');
+
+    try {
+      const updated = donationService.verifyOtpAndPickup(selectedDonation.id, enteredOtp);
+      setSelectedDonation(updated);
+      setOtpSuccess('✓ Handover PIN verified! Food marked as picked up.');
+      setEnteredOtp('');
+      loadDonations();
+    } catch (err) {
+      setOtpError(err.message || 'Invalid Handover PIN.');
+    }
   };
 
   return (
@@ -101,9 +129,152 @@ export default function NGODistributionsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <DonationTimeline
                     currentStatus={selectedDonation.status}
-                    canAdvance={true}
-                    onAdvanceStatus={handleAdvanceStatus}
+                    canAdvance={false}
                   />
+
+                  {/* Dispatch Workflow & Handover Security Action Box */}
+                  {selectedDonation.status === 'accepted' && (
+                    <div className="card" style={{ padding: '22px 24px', border: '1.5px solid #cbd5e1', background: '#f8fafc' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                        <div>
+                          <span className="badge badge-green" style={{ marginBottom: '6px' }}>Stage 1 of 3</span>
+                          <h4 style={{ margin: '4px 0 0 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
+                            Ready to Depart for Pickup?
+                          </h4>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                            Notify <strong>{selectedDonation.donorName}</strong> that your volunteer or vehicle is en route to their kitchen gate.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAdvanceStatus('pickup_started')}
+                          className="btn btn-primary"
+                          style={{ padding: '12px 20px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <span>🚚</span> Start Pickup Journey
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedDonation.status === 'pickup_started' && (
+                    <div className="card" style={{
+                      padding: '24px',
+                      background: '#f0f9ff',
+                      border: '2px solid #0284c7',
+                      borderRadius: '16px',
+                      boxShadow: '0 8px 24px rgba(2, 132, 199, 0.12)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '1.5rem' }}>🔐</span>
+                        <div>
+                          <span className="badge badge-blue" style={{ marginBottom: '2px' }}>Stage 2 of 3 • Mandatory Verification</span>
+                          <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0369a1' }}>
+                            Physical Handover Security Verification
+                          </h4>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: '#334155', margin: '6px 0 16px 0', lineHeight: 1.45 }}>
+                        Arrived at <strong>{selectedDonation.donorName}</strong> ({selectedDonation.pickupAddress})? Inspect the packaging, ask the kitchen dispatch manager for their <strong>4-digit Handover PIN</strong>, and enter it below to confirm collection:
+                      </p>
+
+                      {otpError && (
+                        <div style={{ backgroundColor: '#fee2e2', border: '1.5px solid #f87171', color: '#b91c1c', padding: '12px 16px', borderRadius: '10px', fontSize: '0.88rem', marginBottom: '16px', fontWeight: 600 }}>
+                          {otpError}
+                        </div>
+                      )}
+
+                      {otpSuccess && (
+                        <div style={{ backgroundColor: '#dcfce7', border: '1.5px solid #86efac', color: '#15803d', padding: '12px 16px', borderRadius: '10px', fontSize: '0.88rem', marginBottom: '16px', fontWeight: 600 }}>
+                          {otpSuccess}
+                        </div>
+                      )}
+
+                      <form onSubmit={handleVerifyOtp} style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          maxLength="4"
+                          required
+                          value={enteredOtp}
+                          onChange={(e) => {
+                            setEnteredOtp(e.target.value.replace(/\D/g, ''));
+                            setOtpError('');
+                          }}
+                          placeholder="4-Digit PIN"
+                          style={{
+                            width: '160px',
+                            padding: '12px 16px',
+                            borderRadius: '10px',
+                            border: '2px solid #38bdf8',
+                            fontSize: '1.4rem',
+                            fontWeight: 800,
+                            letterSpacing: '8px',
+                            textAlign: 'center',
+                            outline: 'none',
+                            fontFamily: 'monospace',
+                            backgroundColor: '#ffffff'
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          style={{ padding: '12px 22px', fontWeight: 800, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <span>🔐</span> Verify PIN & Confirm Collection
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  {selectedDonation.status === 'picked_up' && (
+                    <div className="card" style={{ padding: '22px 24px', border: '1.5px solid #86efac', background: '#f0fdf4' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span className="badge badge-success">✓ Handover Verified</span>
+                            <span style={{ fontSize: '0.8rem', color: '#166534' }}>Food in Transit</span>
+                          </div>
+                          <h4 style={{ margin: '4px 0 0 0', fontSize: '1.05rem', color: '#0f172a', fontWeight: 800 }}>
+                            Stage 3 of 3: Deliver to Beneficiaries
+                          </h4>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#475569' }}>
+                            Delivering to shelter / community kitchen: <strong>{selectedDonation.dropAddress}</strong>.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleAdvanceStatus('delivered')}
+                          className="btn btn-success"
+                          style={{ padding: '12px 22px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                          <span>✅</span> Mark as Delivered to Beneficiaries
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedDonation.status === 'delivered' && (
+                    <div style={{
+                      backgroundColor: '#f0fdf4',
+                      border: '1.5px solid #86efac',
+                      borderRadius: '16px',
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      color: '#15803d'
+                    }}>
+                      <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: '#22c55e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 800 }}>
+                        ✓
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '1.05rem' }}>Donation Successfully Completed & Distributed!</strong>
+                        <div style={{ fontSize: '0.86rem', color: '#166534', marginTop: '3px' }}>
+                          All milestones completed. {selectedDonation.quantity} reached people in need safely.
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="card">
                     <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary-dark)', marginBottom: '14px' }}>
