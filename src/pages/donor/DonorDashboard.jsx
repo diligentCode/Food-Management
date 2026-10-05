@@ -4,6 +4,7 @@ import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
 import { foodService, donationService } from '../../services/dataService';
+import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 import '../../styles/Dashboard.css';
 
 export default function DonorDashboard() {
@@ -11,6 +12,7 @@ export default function DonorDashboard() {
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [activeDonations, setActiveDonations] = useState([]);
+  const [quantumModalItem, setQuantumModalItem] = useState(null);
 
   const loadData = () => {
     if (currentUser) {
@@ -187,15 +189,35 @@ export default function DonorDashboard() {
                       <span className={`badge ${item.status === 'expired' ? 'badge-warning' : 'badge-success'}`}>
                         ● {item.status.replace('_', ' ').toUpperCase()}
                       </span>
-                      <Link to="/donor/listings" className="btn btn-primary btn-sm">
-                        Manage Listing &rarr;
-                      </Link>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '6px' }}>
+                        {item.status === 'available' && (
+                          <button
+                            type="button"
+                            onClick={() => setQuantumModalItem(item)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Run Simulated Quantum Annealing to find optimal recipient NGO"
+                          >
+                            <span>⚛️</span> Quantum Match
+                          </button>
+                        )}
+                        <Link to="/donor/listings" className="btn btn-primary btn-sm">
+                          Manage &rarr;
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
           </div>
+
+          {/* Quantum Match Modal */}
+          <QuantumMatchModal
+            listing={quantumModalItem}
+            isOpen={Boolean(quantumModalItem)}
+            onClose={() => setQuantumModalItem(null)}
+          />
         </div>
       </div>
     </div>

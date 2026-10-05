@@ -79,6 +79,9 @@ export default function ChatPage() {
       if (!e.detail || e.detail.collection === 'messages') {
         loadMessages();
       }
+      if (!e.detail || e.detail.collection === 'users' || e.detail.collection === 'donations') {
+        loadContacts();
+      }
     };
     window.addEventListener('foodconnect_data_updated', handleDataUpdate);
 

@@ -4,12 +4,14 @@ import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
 import { foodService } from '../../services/dataService';
+import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 
 export default function MyListingsPage() {
   const { currentUser } = useAuth();
   const [listings, setListings] = useState([]);
   const [filter, setFilter] = useState('all');
   const [editingItem, setEditingItem] = useState(null);
+  const [quantumModalItem, setQuantumModalItem] = useState(null);
 
   const loadListings = () => {
     if (currentUser) {
@@ -161,12 +163,23 @@ export default function MyListingsPage() {
                         </Link>
                       )}
                       {item.status === 'available' && (
-                        <button
-                          onClick={() => setEditingItem(item)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          ✏️ Edit
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setQuantumModalItem(item)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Run Simulated Quantum Annealing to find optimal recipient NGO"
+                          >
+                            <span>⚛️</span> Quantum Match
+                          </button>
+                          <button
+                            onClick={() => setEditingItem(item)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            ✏️ Edit
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => handleDelete(item.id)}
@@ -241,6 +254,13 @@ export default function MyListingsPage() {
               </div>
             </div>
           )}
+
+          {/* Quantum Match Modal */}
+          <QuantumMatchModal
+            listing={quantumModalItem}
+            isOpen={Boolean(quantumModalItem)}
+            onClose={() => setQuantumModalItem(null)}
+          />
         </div>
       </div>
     </div>

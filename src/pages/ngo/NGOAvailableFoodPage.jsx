@@ -3,6 +3,7 @@ import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import { useAuth } from '../../context/AuthContext';
 import { foodService, donationService, isListingExpired } from '../../services/dataService';
+import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 
 export default function NGOAvailableFoodPage() {
   const { currentUser } = useAuth();
@@ -13,6 +14,7 @@ export default function NGOAvailableFoodPage() {
   const [selectedType, setSelectedType] = useState('all'); // all, free, paid
   const [acceptingItem, setAcceptingItem] = useState(null);
   const [paymentOption, setPaymentOption] = useState('pickup_cash');
+  const [quantumModalItem, setQuantumModalItem] = useState(null);
 
   const loadListings = () => {
     setListings(foodService.getAvailableListings());
@@ -192,6 +194,16 @@ export default function NGOAvailableFoodPage() {
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '0.78rem' }}>
                         <span className="meta-pill pill-muted">⚖️ {food.quantity} {food.unit}</span>
                         <span className="meta-pill pill-fresh">✨ AI: {food.qualityScore || 75}%</span>
+                        <button
+                          type="button"
+                          onClick={() => setQuantumModalItem(food)}
+                          style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }}
+                          title="View Quantum Match Analysis"
+                        >
+                          <span className="meta-pill" style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontWeight: 700 }}>
+                            ⚛️ Q-Match: 95%
+                          </span>
+                        </button>
                         {expired ? (
                           <span className="meta-pill pill-expiry">⚠️ Expired</span>
                         ) : (
@@ -203,14 +215,24 @@ export default function NGOAvailableFoodPage() {
                         {food.description}
                       </p>
 
-                      <button
-                        onClick={() => setAcceptingItem(food)}
-                        disabled={expired}
-                        className="btn btn-primary"
-                        style={{ marginTop: 'auto', width: '100%', opacity: expired ? 0.5 : 1 }}
-                      >
-                        {expired ? 'Expired' : food.listingType === 'paid' ? '🤝 Accept & Settle (Paid)' : '🤝 Accept Food Donation'}
-                      </button>
+                      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setQuantumModalItem(food)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ background: '#f8fafc', color: '#0284c7', border: '1px solid #cbd5e1', fontSize: '0.76rem', fontWeight: 700 }}
+                        >
+                          ⚛️ View Quantum Routing
+                        </button>
+                        <button
+                          onClick={() => setAcceptingItem(food)}
+                          disabled={expired}
+                          className="btn btn-primary"
+                          style={{ width: '100%', opacity: expired ? 0.5 : 1 }}
+                        >
+                          {expired ? 'Expired' : food.listingType === 'paid' ? '🤝 Accept & Settle (Paid)' : '🤝 Accept Food Donation'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -288,6 +310,13 @@ export default function NGOAvailableFoodPage() {
               </div>
             </div>
           )}
+
+          {/* Quantum Match Modal */}
+          <QuantumMatchModal
+            listing={quantumModalItem}
+            isOpen={Boolean(quantumModalItem)}
+            onClose={() => setQuantumModalItem(null)}
+          />
         </div>
       </div>
     </div>

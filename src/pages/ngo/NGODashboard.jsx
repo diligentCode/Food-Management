@@ -4,6 +4,7 @@ import Sidebar from '../../components/layout/Sidebar';
 import AppNavbar from '../../components/layout/AppNavbar';
 import AIQualityCard from '../../components/common/AIQualityCard';
 import FoodConnectMap from '../../components/common/FoodConnectMap';
+import QuantumMatchModal from '../../components/common/QuantumMatchModal';
 import { useAuth } from '../../context/AuthContext';
 import { foodService, donationService, isListingExpired, calculateDistanceKm } from '../../services/dataService';
 import '../../styles/Dashboard.css';
@@ -18,6 +19,7 @@ export default function NGODashboard() {
   const [acceptedDonations, setAcceptedDonations] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
+  const [quantumModalItem, setQuantumModalItem] = useState(null);
   const [paymentOption, setPaymentOption] = useState('pickup_cash'); // 'pickup_cash' | 'direct_upi'
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -251,6 +253,16 @@ export default function NGODashboard() {
                               <span className="meta-pill pill-fresh">
                                 ✨ AI Score: {item.qualityScore || 75}%
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => setQuantumModalItem(item)}
+                                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }}
+                                title="View Quantum Match Analysis"
+                              >
+                                <span className="meta-pill" style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontWeight: 700 }}>
+                                  ⚛️ Q-Match: 95%
+                                </span>
+                              </button>
                             </div>
                           </div>
 
@@ -270,7 +282,16 @@ export default function NGODashboard() {
                               </span>
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => setQuantumModalItem(item)}
+                                className="btn btn-secondary btn-sm"
+                                style={{ background: '#0f172a', color: '#38bdf8', border: '1px solid #1e293b', fontSize: '0.74rem' }}
+                                title="View Quantum Match Analysis"
+                              >
+                                ⚛️ Quantum
+                              </button>
                               <button
                                 onClick={() => handleAcceptFood(item)}
                                 disabled={acceptingId === item.id || expired}
@@ -609,6 +630,13 @@ export default function NGODashboard() {
               </div>
             </div>
           )}
+
+          {/* Quantum Match Modal */}
+          <QuantumMatchModal
+            listing={quantumModalItem}
+            isOpen={Boolean(quantumModalItem)}
+            onClose={() => setQuantumModalItem(null)}
+          />
         </div>
       </div>
     </div>
