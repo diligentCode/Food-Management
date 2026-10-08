@@ -8,6 +8,8 @@
 // - Cryptographic Session Expiration & Tamper-Detection
 // ===================================================================
 
+import emailjs from '@emailjs/browser';
+
 const STORAGE_LOCKOUT_KEY = 'foodconnect_admin_security_lockout';
 const STORAGE_ADMIN_SESSION_KEY = 'foodconnect_admin_session_token';
 const STORAGE_ADMIN_PROFILE_KEY = 'foodconnect_admin_profile_v2';
@@ -212,29 +214,19 @@ export const adminAuthService = {
         message: `Your FoodConnect Central Admin Login OTP is: ${otpCode}. It is valid for 5 minutes. Do not share this with anyone.`
       };
 
-      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          service_id: config.serviceId,
-          template_id: config.templateId,
-          user_id: config.publicKey,
-          template_params: templateParams
-        })
-      });
+      const result = await emailjs.send(
+        config.serviceId,
+        config.templateId,
+        templateParams,
+        config.publicKey
+      );
 
-      if (response.ok) {
+      if (result.status === 200 || result.text === 'OK') {
         emailDelivered = true;
-      } else {
-        const errorText = await response.text();
-        console.warn('EmailJS response warning:', response.status, errorText);
-        emailErrorMsg = errorText;
       }
     } catch (netErr) {
-      console.warn('EmailJS network error:', netErr);
-      emailErrorMsg = netErr.message;
+      console.warn('EmailJS SDK delivery warning:', netErr);
+      emailErrorMsg = netErr?.text || netErr?.message || (typeof netErr === 'string' ? netErr : 'Service error');
     }
 
     return {
