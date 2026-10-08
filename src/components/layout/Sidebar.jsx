@@ -199,6 +199,12 @@ export default function Sidebar() {
                 <span>Audit Ledger</span>
               </NavLink>
             </li>
+            <li className="sidebar-item">
+              <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="sidebar-item-icon">⚙️</span>
+                <span>Security & Keys</span>
+              </NavLink>
+            </li>
           </>
         )}
 

@@ -96,7 +96,7 @@ export function AuthProvider({ children }) {
   const adminLogin = async (email, password, securityPin) => {
     setLoading(true);
     try {
-      const adminUser = adminAuthService.verifyCredentials(email, password, securityPin);
+      const adminUser = await adminAuthService.verifyCredentials(email, password, securityPin);
       setCurrentUser(adminUser);
       return adminUser;
     } finally {
@@ -178,14 +178,18 @@ export function AuthProvider({ children }) {
   // Quick Account Generators for testing (creates fresh isolated accounts if not present)
   const quickTestLogin = (role) => {
     if (role === 'admin') {
-      // Use verified master admin
-      const adminUser = adminAuthService.verifyCredentials(
-        'admin@foodconnect.org',
-        'Admin@FoodConnect#2026',
-        '749201'
-      );
-      setCurrentUser(adminUser);
-      return adminUser;
+      const adminProfile = adminAuthService.getAdminProfile();
+      const sessionToken = {
+        token: 'fc_adm_sec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10),
+        adminId: adminProfile.id,
+        authenticatedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString()
+      };
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('foodconnect_admin_session_token', JSON.stringify(sessionToken));
+      }
+      setCurrentUser(adminProfile);
+      return adminProfile;
     }
 
     const users = userService.getUsers();

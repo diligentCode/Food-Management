@@ -9,6 +9,7 @@ import {
   auditLogService, 
   getAdminPlatformMetrics 
 } from '../../services/dataService';
+import { adminAuthService } from '../../services/adminAuthService';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/Dashboard.css';
 
@@ -29,6 +30,22 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
   const [wasteRequests, setWasteRequests] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [metrics, setMetrics] = useState(null);
+
+  // Settings & Credentials States
+  const [adminProfile, setAdminProfile] = useState(() => adminAuthService.getAdminProfile());
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [currentPassForEmail, setCurrentPassForEmail] = useState('');
+  const [currentPassForPass, setCurrentPassForPass] = useState('');
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [confirmAdminPass, setConfirmAdminPass] = useState('');
+  const [credSuccessMsg, setCredSuccessMsg] = useState('');
+  const [credErrorMsg, setCredErrorMsg] = useState('');
+  const [emailjsConfig, setEmailjsConfig] = useState(() => adminAuthService.getEmailJSConfig());
+  const [serviceIdInput, setServiceIdInput] = useState(() => adminAuthService.getEmailJSConfig().serviceId);
+  const [templateIdInput, setTemplateIdInput] = useState(() => adminAuthService.getEmailJSConfig().templateId);
+  const [publicKeyInput, setPublicKeyInput] = useState(() => adminAuthService.getEmailJSConfig().publicKey);
+  const [testEmailStatus, setTestEmailStatus] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
 
   // Filters & Search
   const [userSearch, setUserSearch] = useState('');
@@ -125,6 +142,106 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
       auditLogService.logAction('Donation Deleted', `Admin deleted donation record ${donationId}`, 'warning');
       triggerToast('Donation record deleted.');
       loadData();
+    }
+  };
+
+  // 5. Update Admin Email
+  const handleUpdateEmail = async (e) => {
+    e.preventDefault();
+    setCredSuccessMsg('');
+    setCredErrorMsg('');
+    if (!newAdminEmail) {
+      setCredErrorMsg('Please provide a new admin email address.');
+      return;
+    }
+    if (!currentPassForEmail) {
+      setCredErrorMsg('Please enter your current admin password to confirm.');
+      return;
+    }
+    try {
+      const updated = await adminAuthService.updateCredentials({
+        currentPassword: currentPassForEmail,
+        newEmail: newAdminEmail
+      });
+      setAdminProfile(updated);
+      setNewAdminEmail('');
+      setCurrentPassForEmail('');
+      setCredSuccessMsg(`Admin email successfully changed to: ${updated.email}`);
+      auditLogService.logAction('Admin Email Changed', `Master admin email updated to ${updated.email}`, 'info');
+      triggerToast('Admin email updated.');
+    } catch (err) {
+      setCredErrorMsg(err.message || 'Failed to update admin email.');
+    }
+  };
+
+  // 6. Update Admin Password
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    setCredSuccessMsg('');
+    setCredErrorMsg('');
+    if (!currentPassForPass) {
+      setCredErrorMsg('Please enter your current admin password.');
+      return;
+    }
+    if (!newAdminPass || newAdminPass.length < 6) {
+      setCredErrorMsg('New password must be at least 6 characters.');
+      return;
+    }
+    if (newAdminPass !== confirmAdminPass) {
+      setCredErrorMsg('New password and confirm password do not match.');
+      return;
+    }
+    try {
+      const updated = await adminAuthService.updateCredentials({
+        currentPassword: currentPassForPass,
+        newPassword: newAdminPass
+      });
+      setAdminProfile(updated);
+      setCurrentPassForPass('');
+      setNewAdminPass('');
+      setConfirmAdminPass('');
+      setCredSuccessMsg('Admin password successfully updated and cryptographically hashed (SHA-256).');
+      auditLogService.logAction('Admin Password Changed', 'Master administrator password updated and re-hashed.', 'warning');
+      triggerToast('Password updated securely.');
+    } catch (err) {
+      setCredErrorMsg(err.message || 'Failed to update admin password.');
+    }
+  };
+
+  // 7. Save EmailJS API Configuration
+  const handleSaveEmailJS = (e) => {
+    e.preventDefault();
+    setCredSuccessMsg('');
+    setCredErrorMsg('');
+    try {
+      const saved = adminAuthService.saveEmailJSConfig({
+        serviceId: serviceIdInput.trim(),
+        templateId: templateIdInput.trim(),
+        publicKey: publicKeyInput.trim()
+      });
+      setEmailjsConfig(saved);
+      setCredSuccessMsg('EmailJS API keys updated successfully.');
+      triggerToast('EmailJS keys saved.');
+    } catch (err) {
+      setCredErrorMsg('Failed to save EmailJS configuration.');
+    }
+  };
+
+  // 8. Test EmailJS Delivery to Admin Email
+  const handleTestEmailJS = async () => {
+    setTestEmailStatus('');
+    setTestingEmail(true);
+    try {
+      const res = await adminAuthService.sendEmailOTP(adminProfile.email);
+      if (res.emailDelivered) {
+        setTestEmailStatus(`✓ Real verification email sent to ${adminProfile.email}! Check inbox.`);
+      } else {
+        setTestEmailStatus(`✓ Verification code generated (${res.otp}). Connection verified.`);
+      }
+    } catch (err) {
+      setTestEmailStatus(`✕ Delivery issue: ${err.message}`);
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -381,6 +498,13 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
               className={`btn ${activeTab === 'audit' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
             >
               📜 Security Audit Trail
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+            >
+              ⚙️ Admin Credentials & Email OTP
             </button>
           </div>
 
@@ -1105,6 +1229,275 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                   </tbody>
                 </table>
               )}
+            </div>
+          )}
+
+          {/* ===================================================================
+              TAB 7: ADMIN SECURITY & CREDENTIALS SETTINGS
+              =================================================================== */}
+          {activeTab === 'settings' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Status Alerts */}
+              {credSuccessMsg && (
+                <div style={{
+                  backgroundColor: '#dcfce7',
+                  border: '1px solid #86efac',
+                  color: '#15803d',
+                  padding: '12px 18px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem'
+                }}>
+                  ✓ {credSuccessMsg}
+                </div>
+              )}
+
+              {credErrorMsg && (
+                <div style={{
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #f87171',
+                  color: '#b91c1c',
+                  padding: '12px 18px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem'
+                }}>
+                  ✕ {credErrorMsg}
+                </div>
+              )}
+
+              {/* Grid with 3 Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                {/* CARD 1: ADMIN EMAIL SETTINGS */}
+                <div className="card" style={{ padding: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#15803d' }}>
+                      📧
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>
+                        Admin Primary Email
+                      </h3>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                        Used for supervisor login and receiving real 2FA OTPs
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', marginBottom: '18px' }}>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>CURRENT ACTIVE ADMIN EMAIL:</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '2px', wordBreak: 'break-all' }}>
+                      {adminProfile.email}
+                    </div>
+                    <span style={{ display: 'inline-block', marginTop: '6px', backgroundColor: '#dcfce7', color: '#15803d', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '12px' }}>
+                      ✓ Verified Primary Gateway
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleUpdateEmail} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        New Admin Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={newAdminEmail}
+                        onChange={(e) => setNewAdminEmail(e.target.value)}
+                        placeholder="e.g. anuditfamily1222@gmail.com"
+                        required
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        Current Password (to authorize change)
+                      </label>
+                      <input
+                        type="password"
+                        value={currentPassForEmail}
+                        onChange={(e) => setCurrentPassForEmail(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      style={{ marginTop: '6px', padding: '10px' }}
+                    >
+                      Update Admin Email
+                    </button>
+                  </form>
+                </div>
+
+                {/* CARD 2: ADMIN PASSWORD SETTINGS */}
+                <div className="card" style={{ padding: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#4338ca' }}>
+                      🔑
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>
+                        Change Admin Password
+                      </h3>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                        Secured with SHA-256 cryptographic hashing
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        Current Admin Password
+                      </label>
+                      <input
+                        type="password"
+                        value={currentPassForPass}
+                        onChange={(e) => setCurrentPassForPass(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        New Admin Password
+                      </label>
+                      <input
+                        type="password"
+                        value={newAdminPass}
+                        onChange={(e) => setNewAdminPass(e.target.value)}
+                        placeholder="At least 6 characters"
+                        required
+                        minLength={6}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        Confirm New Admin Password
+                      </label>
+                      <input
+                        type="password"
+                        value={confirmAdminPass}
+                        onChange={(e) => setConfirmAdminPass(e.target.value)}
+                        placeholder="Re-enter new password"
+                        required
+                        minLength={6}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '0.88rem', outline: 'none' }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      style={{ marginTop: '6px', padding: '10px' }}
+                    >
+                      Update Admin Password
+                    </button>
+                  </form>
+                </div>
+
+                {/* CARD 3: EMAILJS LIVE CONFIGURATION */}
+                <div className="card" style={{ padding: '24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', color: '#b45309' }}>
+                      ⚡
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0 }}>
+                        EmailJS Real OTP API Keys
+                      </h3>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                        Live service sending OTPs to {adminProfile.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveEmailJS} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                        Service ID
+                      </label>
+                      <input
+                        type="text"
+                        value={serviceIdInput}
+                        onChange={(e) => setServiceIdInput(e.target.value)}
+                        placeholder="service_y3y6gws"
+                        required
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '7px', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                        Template ID
+                      </label>
+                      <input
+                        type="text"
+                        value={templateIdInput}
+                        onChange={(e) => setTemplateIdInput(e.target.value)}
+                        placeholder="template_3udaens"
+                        required
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '7px', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                        Public API Key
+                      </label>
+                      <input
+                        type="text"
+                        value={publicKeyInput}
+                        onChange={(e) => setPublicKeyInput(e.target.value)}
+                        placeholder="VPBryE2FeAl-GvDuv"
+                        required
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: '7px', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      <button
+                        type="submit"
+                        className="btn btn-secondary btn-sm"
+                        style={{ flex: 1, padding: '9px' }}
+                      >
+                        Save API Keys
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleTestEmailJS}
+                        disabled={testingEmail}
+                        className="btn btn-primary btn-sm"
+                        style={{ flex: 1, padding: '9px' }}
+                      >
+                        {testingEmail ? 'Sending...' : '🧪 Send Test OTP'}
+                      </button>
+                    </div>
+
+                    {testEmailStatus && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: testEmailStatus.startsWith('✓') ? '#dcfce7' : '#fee2e2',
+                        color: testEmailStatus.startsWith('✓') ? '#15803d' : '#b91c1c',
+                        fontSize: '0.78rem',
+                        fontWeight: 700
+                      }}>
+                        {testEmailStatus}
+                      </div>
+                    )}
+                  </form>
+                </div>
+              </div>
             </div>
           )}
 

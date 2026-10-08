@@ -8,7 +8,6 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PendingApprovalPage from './pages/auth/PendingApprovalPage';
-import AdminLoginPage from './pages/admin/AdminLoginPage';
 
 // Donor Pages
 import DonorDashboard from './pages/donor/DonorDashboard';
@@ -37,8 +36,7 @@ export default function App() {
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin/login" element={<Navigate to="/login?mode=admin" replace />} />
         <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
         {/* DONOR PROTECTED ROUTES */}
@@ -195,6 +193,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminDashboard defaultTab="audit" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard defaultTab="settings" />
             </ProtectedRoute>
           }
         />

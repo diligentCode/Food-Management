@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Not signed in at all
   if (!currentUser) {
     if (allowedRoles && allowedRoles.includes('admin')) {
-      return <Navigate to="/admin/login" state={{ from: location }} replace />;
+      return <Navigate to="/login?mode=admin" state={{ from: location }} replace />;
     }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   // Admin route protection: Must have admin role AND valid crypto session token
   if (allowedRoles && allowedRoles.includes('admin')) {
     if (userRole !== 'admin' || !adminAuthService.hasValidAdminSession()) {
-      return <Navigate to="/admin/login" state={{ from: location, securityAlert: 'Admin authorization required.' }} replace />;
+      return <Navigate to="/login?mode=admin" state={{ from: location, securityAlert: 'Admin authorization required.' }} replace />;
     }
     return children;
   }
