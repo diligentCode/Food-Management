@@ -53,8 +53,22 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
 
   return (
     <header className="dashboard-topbar">
-      {/* Left: Search Bar or Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      {/* Left: Mobile Toggle + Search Bar or Title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+        <button
+          type="button"
+          className="mobile-menu-toggle-btn"
+          onClick={() => window.dispatchEvent(new CustomEvent('foodconnect_toggle_sidebar'))}
+          aria-label="Open navigation menu"
+          title="Open Menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
         {onSearchChange ? (
           <div className="topbar-search">
             <span className="search-icon">🔍</span>
@@ -66,12 +80,12 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
             />
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary-dark)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {title || 'FoodConnect'}
             </h2>
-            <span className="badge badge-green" style={{ textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: '0.04em' }}>
-              {userRole === 'donor' ? 'Donor Portal' : userRole === 'ngo' ? 'NGO Portal' : 'Admin'}
+            <span className="badge badge-green" style={{ textTransform: 'uppercase', fontSize: '0.68rem', letterSpacing: '0.04em', flexShrink: 0 }}>
+              {userRole === 'donor' ? 'Donor' : userRole === 'ngo' ? 'NGO' : 'Admin'}
             </span>
           </div>
         )}
@@ -93,12 +107,13 @@ export default function AppNavbar({ searchTerm, onSearchChange, title }) {
           {showNotifs && (
             <div style={{
               position: 'absolute',
-              right: 0,
+              right: '-10px',
               top: '48px',
-              width: '340px',
+              width: 'min(340px, calc(100vw - 32px))',
+              maxWidth: '92vw',
               background: '#ffffff',
               borderRadius: '12px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
               border: '1px solid var(--color-border)',
               padding: '16px',
               zIndex: 1000

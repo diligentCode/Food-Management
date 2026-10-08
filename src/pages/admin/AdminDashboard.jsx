@@ -627,22 +627,24 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                         </div>
 
                         {/* Interactive Step Milestone Progress Bar */}
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(5, 1fr)',
-                          gap: '8px',
-                          backgroundColor: '#f8fafc',
-                          padding: '14px 16px',
-                          borderRadius: '10px',
-                          border: '1px solid var(--color-border)',
-                          marginBottom: '10px'
-                        }}>
-                          {/* Step 1 */}
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '1rem', color: stage >= 1 ? '#10b981' : '#cbd5e1' }}>●</div>
-                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: stage >= 1 ? '#065f46' : '#94a3b8' }}>1. Food Listed</div>
-                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Kitchen Gate</div>
-                          </div>
+                        <div className="admin-flow-stepper">
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(5, 1fr)',
+                            gap: '8px',
+                            minWidth: '520px',
+                            backgroundColor: '#f8fafc',
+                            padding: '14px 16px',
+                            borderRadius: '10px',
+                            border: '1px solid var(--color-border)',
+                            marginBottom: '10px'
+                          }}>
+                            {/* Step 1 */}
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '1rem', color: stage >= 1 ? '#10b981' : '#cbd5e1' }}>●</div>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: stage >= 1 ? '#065f46' : '#94a3b8' }}>1. Food Listed</div>
+                              <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Kitchen Gate</div>
+                            </div>
 
                           {/* Step 2 */}
                           <div style={{ textAlign: 'center' }}>
@@ -665,11 +667,12 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                             <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Food Handed Over</div>
                           </div>
 
-                          {/* Step 5 */}
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '1rem', color: stage >= 5 ? '#10b981' : '#cbd5e1' }}>●</div>
-                            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: stage >= 5 ? '#065f46' : '#94a3b8' }}>5. Delivered</div>
-                            <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Distributed to Needy</div>
+                            {/* Step 5 */}
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '1rem', color: stage >= 5 ? '#10b981' : '#cbd5e1' }}>●</div>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: stage >= 5 ? '#065f46' : '#94a3b8' }}>5. Delivered</div>
+                              <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Distributed to Needy</div>
+                            </div>
                           </div>
                         </div>
 
@@ -849,8 +852,8 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
               </div>
 
               {/* Users Table */}
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+              <div className="card table-responsive" style={{ padding: 0 }}>
+                <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                   <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--color-border)' }}>
                     <tr>
                       <th style={{ padding: '14px 18px', color: '#64748b' }}>Organization</th>
@@ -1014,7 +1017,7 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
               </div>
 
               {/* Visual Breakdown Charts */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+              <div className="admin-charts-grid">
                 {/* Visual Chart 1: Food Journey Status Distribution */}
                 <div className="card" style={{ padding: '24px' }}>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0 0 16px 0' }}>
@@ -1114,13 +1117,13 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
               TAB 5: SURPLUS FOOD LISTINGS MODERATION
               =================================================================== */}
           {activeTab === 'listings' && (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card table-responsive" style={{ padding: 0 }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', backgroundColor: '#f8fafc' }}>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>
                   Moderating All Surplus Postings ({listings.length})
                 </h3>
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+              <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                 <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--color-border)' }}>
                   <tr>
                     <th style={{ padding: '14px 18px', color: '#64748b' }}>Food Item</th>
@@ -1173,7 +1176,7 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
               TAB 6: SECURITY AUDIT LOGS
               =================================================================== */}
           {activeTab === 'audit' && (
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card table-responsive" style={{ padding: 0 }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>
@@ -1190,7 +1193,7 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                   No audit entries recorded yet.
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
+                <table style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
                   <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--color-border)' }}>
                     <tr>
                       <th style={{ padding: '12px 18px', color: '#64748b' }}>Exact Date & Time</th>

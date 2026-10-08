@@ -8,6 +8,7 @@ export default function Sidebar() {
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const updateCounts = () => {
     if (currentUser?.id) {
@@ -24,28 +25,70 @@ export default function Sidebar() {
     const interval = setInterval(updateCounts, 2500);
 
     const handleUpdate = () => updateCounts();
+    const handleToggle = () => setIsMobileOpen((prev) => !prev);
+    const handleClose = () => setIsMobileOpen(false);
+
     window.addEventListener('foodconnect_data_updated', handleUpdate);
+    window.addEventListener('foodconnect_toggle_sidebar', handleToggle);
+    window.addEventListener('foodconnect_close_sidebar', handleClose);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('foodconnect_data_updated', handleUpdate);
+      window.removeEventListener('foodconnect_toggle_sidebar', handleToggle);
+      window.removeEventListener('foodconnect_close_sidebar', handleClose);
     };
   }, [currentUser]);
 
+  const closeMobile = () => setIsMobileOpen(false);
+
   return (
-    <aside className="sidebar">
-      {/* Brand Header */}
-      <Link to="/" className="sidebar-logo">
-        <div className="brand-icon" style={{ width: '36px', height: '36px', background: '#10b981' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#0b462f"/>
-          </svg>
+    <>
+      {isMobileOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={closeMobile}
+          aria-label="Close navigation overlay"
+        />
+      )}
+      <aside className={`sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
+        {/* Brand Header with Close button for Mobile */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Link to="/" className="sidebar-logo" onClick={closeMobile} style={{ flex: 1, marginBottom: 0, paddingBottom: 0, borderBottom: 'none' }}>
+            <div className="brand-icon" style={{ width: '36px', height: '36px', background: '#10b981' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#0b462f"/>
+              </svg>
+            </div>
+            <div className="sidebar-logo-text">
+              <h3>FoodConnect</h3>
+              <p>Share Food, Share Hope</p>
+            </div>
+          </Link>
+          <button
+            type="button"
+            className="sidebar-mobile-close-btn"
+            onClick={closeMobile}
+            aria-label="Close sidebar"
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              color: '#ffffff',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              display: 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              marginLeft: '8px'
+            }}
+          >
+            ✕
+          </button>
         </div>
-        <div className="sidebar-logo-text">
-          <h3>FoodConnect</h3>
-          <p>Share Food, Share Hope</p>
-        </div>
-      </Link>
+        <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.12)', margin: '14px 0 16px 0' }} />
 
       {/* User Card if NGO */}
       {userRole === 'ngo' && (
@@ -64,7 +107,7 @@ export default function Sidebar() {
       )}
 
       {/* Nav List */}
-      <ul className="sidebar-nav">
+      <ul className="sidebar-nav" onClick={closeMobile}>
         {userRole === 'donor' && (
           <>
             <li className="sidebar-item">
@@ -222,5 +265,6 @@ export default function Sidebar() {
         <p>Together, we can reduce food waste and fight hunger.</p>
       </div>
     </aside>
+    </>
   );
 }
