@@ -32,10 +32,10 @@ const DEFAULT_ADMIN_PROFILE = {
   approvalStatus: 'approved'
 };
 
-// Default Configured EmailJS Integration
+// Default Configured EmailJS Integration (Verified from Dashboard)
 const DEFAULT_EMAILJS_CONFIG = {
-  serviceId: 'service_y3y6gws',
-  templateId: 'template_3udaens',
+  serviceId: 'service_ry6td5j',
+  templateId: 'template_hdfazfg',
   publicKey: 'VPBryE2FeAl-GvDuv'
 };
 
@@ -88,7 +88,15 @@ export const adminAuthService = {
     try {
       if (typeof localStorage !== 'undefined') {
         const raw = localStorage.getItem(STORAGE_ADMIN_EMAILJS_KEY);
-        if (raw) return { ...DEFAULT_EMAILJS_CONFIG, ...JSON.parse(raw) };
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.serviceId === 'service_y3y6gws' || !parsed.serviceId) {
+            parsed.serviceId = 'service_ry6td5j';
+            parsed.templateId = 'template_hdfazfg';
+            localStorage.setItem(STORAGE_ADMIN_EMAILJS_KEY, JSON.stringify(parsed));
+          }
+          return { ...DEFAULT_EMAILJS_CONFIG, ...parsed };
+        }
       }
     } catch (e) {
       // ignore
@@ -203,15 +211,16 @@ export const adminAuthService = {
 
     try {
       const templateParams = {
-        to_email: adminEmail,
         email: adminEmail,
-        to_name: admin.name || 'Platform Administrator',
-        user_name: 'Anudit',
+        to_email: adminEmail,
+        passcode: otpCode,
         otp_code: otpCode,
         otp: otpCode,
         code: otpCode,
-        security_pin: otpCode,
-        message: `Your FoodConnect Central Admin Login OTP is: ${otpCode}. It is valid for 5 minutes. Do not share this with anyone.`
+        time: '5 minutes',
+        to_name: admin.name || 'Platform Administrator',
+        user_name: 'Anudit',
+        message: `Your FoodConnect Central Admin Login OTP is: ${otpCode}. It is valid for 5 minutes.`
       };
 
       const result = await emailjs.send(
@@ -232,7 +241,6 @@ export const adminAuthService = {
     return {
       success: true,
       emailDelivered,
-      otp: otpCode, // Provided for instant seamless verification & dev fallback
       email: adminEmail,
       expiresInSeconds: 300,
       emailErrorMsg

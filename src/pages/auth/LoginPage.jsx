@@ -24,7 +24,6 @@ export default function LoginPage() {
   const [adminOtp, setAdminOtp] = useState('');
   const [showAdminPass, setShowAdminPass] = useState(false);
   const [otpSentMsg, setOtpSentMsg] = useState('');
-  const [fallbackOtp, setFallbackOtp] = useState('');
   const [sendingOtp, setSendingOtp] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0);
   const [lockout, setLockout] = useState({ isLocked: false, remainingSeconds: 0 });
@@ -59,7 +58,6 @@ export default function LoginPage() {
   const handleSwitchMode = (newMode) => {
     setError('');
     setOtpSentMsg('');
-    setFallbackOtp('');
     setLoginMode(newMode);
     setSearchParams(newMode === 'admin' ? { mode: 'admin' } : {});
   };
@@ -68,7 +66,6 @@ export default function LoginPage() {
   const handleSendOTP = async () => {
     setError('');
     setOtpSentMsg('');
-    setFallbackOtp('');
 
     if (!adminEmail) {
       setError('Please provide the Admin Email.');
@@ -86,12 +83,9 @@ export default function LoginPage() {
       setOtpCountdown(45); // 45 seconds before resend allowed
 
       if (res.emailDelivered) {
-        setOtpSentMsg(`✓ Real Email OTP successfully dispatched to ${res.email}! Please check your inbox (and spam folder).`);
-        setFallbackOtp('');
+        setOtpSentMsg(`✓ Real Email OTP successfully dispatched to ${res.email}! Please check your Gmail inbox (and Spam folder).`);
       } else {
-        const errorDetail = res.emailErrorMsg ? `EmailJS API Notice: ${res.emailErrorMsg}` : 'Email dispatch pending provider sync.';
-        setOtpSentMsg(`⚠️ ${errorDetail}`);
-        setFallbackOtp(res.otp);
+        setError(`Email Delivery Error: ${res.emailErrorMsg || 'Could not deliver email to ' + res.email}`);
       }
     } catch (err) {
       setError(err.message || 'Failed to dispatch email OTP.');
@@ -429,45 +423,6 @@ export default function LoginPage() {
                 lineHeight: '1.4'
               }}>
                 {otpSentMsg}
-              </div>
-            )}
-
-            {fallbackOtp && (
-              <div style={{
-                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                border: '1px solid #f59e0b',
-                color: '#fef3c7',
-                padding: '12px 14px',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                marginBottom: '16px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontWeight: 800, color: '#fbbf24' }}>
-                      🔑 Live Session OTP: <span style={{ fontSize: '1.15rem', letterSpacing: '0.12em', color: '#ffffff' }}>{fallbackOtp}</span>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: '2px' }}>
-                      Active verification code valid for 5 minutes.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAdminOtp(fallbackOtp)}
-                    style={{
-                      backgroundColor: '#f59e0b',
-                      color: '#0f172a',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                      fontWeight: 800,
-                      fontSize: '0.76rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Auto-Fill Code
-                  </button>
-                </div>
               </div>
             )}
 

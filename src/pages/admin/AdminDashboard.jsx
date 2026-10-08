@@ -1429,7 +1429,7 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                         type="text"
                         value={serviceIdInput}
                         onChange={(e) => setServiceIdInput(e.target.value)}
-                        placeholder="service_y3y6gws"
+                        placeholder="service_ry6td5j"
                         required
                         style={{ width: '100%', padding: '8px 10px', borderRadius: '7px', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
                       />
@@ -1443,7 +1443,7 @@ export default function AdminDashboard({ defaultTab = 'flow' }) {
                         type="text"
                         value={templateIdInput}
                         onChange={(e) => setTemplateIdInput(e.target.value)}
-                        placeholder="template_3udaens"
+                        placeholder="template_hdfazfg"
                         required
                         style={{ width: '100%', padding: '8px 10px', borderRadius: '7px', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
                       />
