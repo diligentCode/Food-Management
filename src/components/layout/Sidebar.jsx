@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { notificationService, messageService } from '../../services/dataService';
+import { notificationService, messageService, userService } from '../../services/dataService';
 
 export default function Sidebar() {
   const { currentUser, userRole, logout } = useAuth();
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const updateCounts = () => {
     if (currentUser?.id) {
       setUnreadNotifs(notificationService.getUnreadCount(currentUser.id));
       setUnreadMsgs(messageService.getUnreadCount(currentUser.id));
+      if (userRole === 'admin') {
+        setPendingCount(userService.getPendingUsers().length);
+      }
     }
   };
 
@@ -156,26 +160,43 @@ export default function Sidebar() {
           <>
             <li className="sidebar-item">
               <NavLink to="/admin" end className={({ isActive }) => isActive ? 'active' : ''}>
-                <span className="sidebar-item-icon">📊</span>
-                <span>Admin Overview</span>
+                <span className="sidebar-item-icon">⚡</span>
+                <span>Live Food Flow</span>
+              </NavLink>
+            </li>
+            <li className="sidebar-item">
+              <NavLink to="/admin/approvals" className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="sidebar-item-icon">🛡️</span>
+                <span>Pending Approvals</span>
+                {pendingCount > 0 && (
+                  <span className="sidebar-badge" style={{ backgroundColor: '#ef4444', color: '#fff' }}>
+                    {pendingCount}
+                  </span>
+                )}
               </NavLink>
             </li>
             <li className="sidebar-item">
               <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">👥</span>
-                <span>Manage Users</span>
+                <span>Users Directory</span>
+              </NavLink>
+            </li>
+            <li className="sidebar-item">
+              <NavLink to="/admin/analytics" className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="sidebar-item-icon">📊</span>
+                <span>Impact & Analytics</span>
               </NavLink>
             </li>
             <li className="sidebar-item">
               <NavLink to="/admin/listings" className={({ isActive }) => isActive ? 'active' : ''}>
                 <span className="sidebar-item-icon">🍲</span>
-                <span>Food Listings</span>
+                <span>Listings Control</span>
               </NavLink>
             </li>
             <li className="sidebar-item">
-              <NavLink to="/admin/donations" className={({ isActive }) => isActive ? 'active' : ''}>
-                <span className="sidebar-item-icon">📦</span>
-                <span>All Donations</span>
+              <NavLink to="/admin/audit" className={({ isActive }) => isActive ? 'active' : ''}>
+                <span className="sidebar-item-icon">📜</span>
+                <span>Audit Ledger</span>
               </NavLink>
             </li>
           </>

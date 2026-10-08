@@ -22,10 +22,17 @@ export default function LoginPage() {
     try {
       setSubmitting(true);
       const user = await login(email, password);
-      if (user.role === 'donor') navigate('/donor');
-      else if (user.role === 'ngo') navigate('/ngo');
-      else if (user.role === 'admin') navigate('/admin');
-      else navigate('/');
+      if (user.role === 'admin') {
+        navigate('/admin/login');
+      } else if (user.approvalStatus === 'pending' || !user.isApproved) {
+        navigate('/pending-approval');
+      } else if (user.role === 'donor') {
+        navigate('/donor');
+      } else if (user.role === 'ngo') {
+        navigate('/ngo');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Login failed. Please check credentials.');
     } finally {
@@ -91,6 +98,12 @@ export default function LoginPage() {
           Don't have an account?{' '}
           <Link to="/register" style={{ color: 'var(--color-primary-dark)', fontWeight: 700 }}>
             Create an Account
+          </Link>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed var(--color-border)' }}>
+          <Link to="/admin/login" style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <span>🛡️</span> Central Security Operator Gateway
           </Link>
         </div>
       </div>

@@ -1,11 +1,6 @@
-// ===================================================================
-// FOODCONNECT - AUTHENTICATION & STRICT ROLE ACCESS CONTROL
-// Manages authentication state, strict role enforcement (donor vs ngo),
-// and session persistence.
-// ===================================================================
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { userService } from '../services/dataService';
+import { adminAuthService } from '../services/adminAuthService';
 import { 
   auth, 
   db, 
@@ -79,7 +74,7 @@ export function AuthProvider({ children }) {
         } else {
           users.push(cloudUserFound);
         }
-        localStorage.setItem('foodconnect_users', JSON.stringify(users));
+        localStorage.setItem('foodconnect_users_v2', JSON.stringify(users));
         setCurrentUser(cloudUserFound);
         return cloudUserFound;
       }
@@ -97,11 +92,26 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Register a new Donor or NGO user (Multi-Device Cloud Aware)
+  // High-Security Single Admin Login Gateway
+  const adminLogin = async (email, password, securityPin) => {
+    setLoading(true);
+    try {
+      const adminUser = adminAuthService.verifyCredentials(email, password, securityPin);
+      setCurrentUser(adminUser);
+      return adminUser;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Register a new Donor or NGO user (Strictly requires Admin Approval)
   const register = async (userData) => {
     setLoading(true);
     try {
       let firebaseUid = null;
+
+      // Prevent public registration from elevating to admin role
+      const assignedRole = userData.role === 'ngo' ? 'ngo' : 'donor';
 
       // 1. If Cloud Firebase is active, register through Firebase Auth
       if (isCloudFirebaseActive() && auth) {
@@ -132,17 +142,19 @@ export function AuthProvider({ children }) {
         throw new Error('An account with this email already exists.');
       }
 
-      // 3. Create user profile in Firestore & local
+      // 3. Create user profile in Firestore & local (Defaults to Pending Admin Approval)
       const newUser = userService.createUser({
         id: firebaseUid || undefined,
         name: userData.name || userData.organizationName,
         organizationName: userData.organizationName,
         email: userData.email.trim(),
         phone: userData.phone || '',
-        role: userData.role, // strictly 'donor' or 'ngo'
+        role: assignedRole,
         city: userData.city || 'Jaipur',
         address: userData.address || '',
-        location: userData.location || { lat: 26.9124, lng: 75.7873 }
+        location: userData.location || { lat: 26.9124, lng: 75.7873 },
+        isApproved: false,
+        approvalStatus: 'pending'
       });
 
       setCurrentUser(newUser);
@@ -152,8 +164,30 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Check and refresh current user's approval status
+  const checkApprovalStatus = () => {
+    if (!currentUser || currentUser.role === 'admin') return currentUser;
+    const latest = userService.getUserById(currentUser.id);
+    if (latest && (latest.approvalStatus !== currentUser.approvalStatus || latest.isApproved !== currentUser.isApproved)) {
+      setCurrentUser(latest);
+      return latest;
+    }
+    return currentUser;
+  };
+
   // Quick Account Generators for testing (creates fresh isolated accounts if not present)
   const quickTestLogin = (role) => {
+    if (role === 'admin') {
+      // Use verified master admin
+      const adminUser = adminAuthService.verifyCredentials(
+        'admin@foodconnect.org',
+        'Admin@FoodConnect#2026',
+        '749201'
+      );
+      setCurrentUser(adminUser);
+      return adminUser;
+    }
+
     const users = userService.getUsers();
     let account = users.find(u => u.role === role);
 
@@ -167,7 +201,9 @@ export function AuthProvider({ children }) {
           role: 'donor',
           address: 'Tonk Road, Jaipur',
           location: { lat: 26.8520, lng: 75.8050 },
-          isVerified: true
+          isVerified: true,
+          isApproved: true,
+          approvalStatus: 'approved'
         });
       } else if (role === 'ngo') {
         account = userService.createUser({
@@ -178,17 +214,9 @@ export function AuthProvider({ children }) {
           role: 'ngo',
           address: 'Adarsh Nagar, Jaipur',
           location: { lat: 26.8920, lng: 75.8250 },
-          isVerified: true
-        });
-      } else if (role === 'admin') {
-        account = userService.createUser({
-          name: 'Platform Administrator',
-          organizationName: 'FoodConnect Operations',
-          email: 'admin@foodconnect.org',
-          phone: '+91 11 2233 4455',
-          role: 'admin',
-          address: 'Central Secretariat, Delhi',
-          isVerified: true
+          isVerified: true,
+          isApproved: true,
+          approvalStatus: 'approved'
         });
       }
     }
@@ -206,6 +234,7 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('Firebase signout notice:', e);
     }
+    adminAuthService.revokeAdminSession();
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_AUTH_KEY);
   };
@@ -222,12 +251,16 @@ export function AuthProvider({ children }) {
     currentUser,
     userRole: currentUser?.role || null,
     isAuthenticated: Boolean(currentUser),
+    isApproved: currentUser?.role === 'admin' ? true : Boolean(currentUser?.isApproved && currentUser?.approvalStatus === 'approved'),
+    approvalStatus: currentUser?.role === 'admin' ? 'approved' : currentUser?.approvalStatus || (currentUser?.isApproved ? 'approved' : 'pending'),
     loading,
     login,
+    adminLogin,
     register,
     logout,
     updateProfile,
-    quickTestLogin
+    quickTestLogin,
+    checkApprovalStatus
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

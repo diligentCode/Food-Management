@@ -27,8 +27,10 @@ const STORAGE_CUSTOM_FIREBASE_KEY = 'foodconnect_custom_firebase_config';
 
 export function getStoredFirebaseConfig() {
   try {
-    const custom = localStorage.getItem(STORAGE_CUSTOM_FIREBASE_KEY);
-    if (custom) return JSON.parse(custom);
+    if (typeof localStorage !== 'undefined') {
+      const custom = localStorage.getItem(STORAGE_CUSTOM_FIREBASE_KEY);
+      if (custom) return JSON.parse(custom);
+    }
   } catch (e) {
     console.warn('Could not parse stored Firebase config:', e);
   }

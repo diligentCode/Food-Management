@@ -7,6 +7,8 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import PendingApprovalPage from './pages/auth/PendingApprovalPage';
+import AdminLoginPage from './pages/admin/AdminLoginPage';
 
 // Donor Pages
 import DonorDashboard from './pages/donor/DonorDashboard';
@@ -36,6 +38,8 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
         {/* DONOR PROTECTED ROUTES */}
         <Route
@@ -150,7 +154,15 @@ export default function App() {
           path="/admin"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
+              <AdminDashboard defaultTab="flow" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/approvals"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard defaultTab="approvals" />
             </ProtectedRoute>
           }
         />
@@ -158,7 +170,15 @@ export default function App() {
           path="/admin/users"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
+              <AdminDashboard defaultTab="users" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard defaultTab="analytics" />
             </ProtectedRoute>
           }
         />
@@ -166,7 +186,15 @@ export default function App() {
           path="/admin/listings"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
+              <AdminDashboard defaultTab="listings" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/audit"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard defaultTab="audit" />
             </ProtectedRoute>
           }
         />
@@ -174,7 +202,7 @@ export default function App() {
           path="/admin/donations"
           element={
             <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
+              <AdminDashboard defaultTab="flow" />
             </ProtectedRoute>
           }
         />

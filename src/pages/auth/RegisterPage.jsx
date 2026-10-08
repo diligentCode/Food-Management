@@ -67,8 +67,8 @@ export default function RegisterPage() {
         password
       });
 
-      if (user.role === 'donor') navigate('/donor');
-      else navigate('/ngo');
+      // All new registrations require Central Admin approval before portal access
+      navigate('/pending-approval');
     } catch (err) {
       setError(err.message || 'Registration failed.');
     } finally {

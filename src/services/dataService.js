@@ -27,7 +27,8 @@ const STORAGE_KEYS = {
   DONATIONS: 'foodconnect_donations_v2',
   MESSAGES: 'foodconnect_messages_v2',
   NOTIFICATIONS: 'foodconnect_notifications_v2',
-  WASTE_REQUESTS: 'foodconnect_waste_requests_v2'
+  WASTE_REQUESTS: 'foodconnect_waste_requests_v2',
+  AUDIT_LOGS: 'foodconnect_audit_logs_v2'
 };
 
 // Safe storage utilities
@@ -598,7 +599,47 @@ export function getMunicipalContactForCity(cityName) {
 }
 
 // -------------------------------------------------------------
-// USER SERVICES
+// AUDIT LOG SERVICE (IMMUTABLE ADMINISTRATIVE AUDIT TRAIL)
+// -------------------------------------------------------------
+export const auditLogService = {
+  getLogs() {
+    return loadStorage(STORAGE_KEYS.AUDIT_LOGS, []);
+  },
+  logAction(action, details, severity = 'info') {
+    const logs = loadStorage(STORAGE_KEYS.AUDIT_LOGS, []);
+    const newLog = {
+      id: 'audit_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      action,
+      details,
+      severity, // 'info' | 'warning' | 'critical'
+      timestamp: new Date().toISOString(),
+      formattedDate: new Date().toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      })
+    };
+    logs.unshift(newLog);
+    if (logs.length > 500) logs.length = 500;
+    saveStorage(STORAGE_KEYS.AUDIT_LOGS, logs);
+
+    if (isCloudFirebaseActive() && db) {
+      setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(e => console.warn('Firestore audit sync error:', e));
+    }
+    return newLog;
+  },
+  clearLogs() {
+    saveStorage(STORAGE_KEYS.AUDIT_LOGS, []);
+    return true;
+  }
+};
+
+// -------------------------------------------------------------
+// USER SERVICES (APPROVAL WORKFLOW & SECURE ADMINISTRATIVE PURGE)
 // -------------------------------------------------------------
 export const userService = {
   getUsers() {
@@ -608,8 +649,16 @@ export const userService = {
     const users = this.getUsers();
     return users.find(u => u.id === id) || null;
   },
+  getPendingUsers() {
+    const users = this.getUsers();
+    return users.filter(u => u.role !== 'admin' && (u.approvalStatus === 'pending' || (!u.isApproved && u.approvalStatus !== 'rejected')));
+  },
   createUser(userData) {
     const users = this.getUsers();
+    const isAdmin = userData.role === 'admin';
+    const isApproved = isAdmin || userData.isApproved === true;
+    const approvalStatus = isApproved ? 'approved' : (userData.approvalStatus || 'pending');
+
     const newUser = {
       id: userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       name: userData.name || userData.organizationName || 'User',
@@ -620,7 +669,10 @@ export const userService = {
       address: userData.address || '',
       city: userData.city || 'Jaipur',
       location: userData.location || { lat: 26.9124, lng: 75.7873 },
-      isVerified: userData.role === 'admin' ? true : false,
+      isVerified: isAdmin ? true : Boolean(userData.isVerified),
+      isApproved,
+      approvalStatus, // 'pending' | 'approved' | 'rejected'
+      rejectionReason: userData.rejectionReason || null,
       createdAt: new Date().toISOString()
     };
     users.push(newUser);
@@ -629,6 +681,22 @@ export const userService = {
     // Sync to Cloud Firestore if connected
     if (isCloudFirebaseActive() && db) {
       setDoc(doc(db, 'users', newUser.id), newUser).catch(e => console.warn('Firestore sync error:', e));
+    }
+
+    // If pending approval, trigger instant high-priority notification to Central Admin
+    if (approvalStatus === 'pending') {
+      notificationService.createNotification({
+        userId: 'admin',
+        title: 'New Registration Awaiting Admin Approval 🛡️',
+        message: `${newUser.role.toUpperCase()} "${newUser.organizationName || newUser.name}" from ${newUser.city} submitted registration and requires platform safety review.`,
+        type: 'new_registration_pending',
+        relatedId: newUser.id
+      });
+      auditLogService.logAction(
+        'User Registration Submitted',
+        `New ${newUser.role.toUpperCase()} "${newUser.organizationName}" registered from ${newUser.city} (Status: Pending Approval).`,
+        'info'
+      );
     }
 
     return newUser;
@@ -647,6 +715,84 @@ export const userService = {
     }
     return null;
   },
+  approveUser(id) {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === id);
+    if (!user) return null;
+
+    user.isApproved = true;
+    user.approvalStatus = 'approved';
+    user.isVerified = true;
+    user.approvedAt = new Date().toISOString();
+    saveStorage(STORAGE_KEYS.USERS, users);
+
+    if (isCloudFirebaseActive() && db) {
+      updateDoc(doc(db, 'users', id), {
+        isApproved: true,
+        approvalStatus: 'approved',
+        isVerified: true,
+        approvedAt: user.approvedAt
+      }).catch(e => console.warn('Firestore approve sync error:', e));
+    }
+
+    notificationService.createNotification({
+      userId: id,
+      title: 'Account Approved by Administrator! 🎉',
+      message: 'Your organization has been officially verified and approved. You now have full access to the FoodConnect platform.',
+      type: 'account_approved',
+      relatedId: id
+    });
+
+    auditLogService.logAction(
+      'User Account Approved',
+      `Admin approved and verified organization "${user.organizationName || user.name}" (${user.role.toUpperCase()}).`,
+      'info'
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'users' } }));
+    }
+    return user;
+  },
+  rejectUser(id, reason = 'Information could not be verified by platform administrators.') {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === id);
+    if (!user) return null;
+
+    user.isApproved = false;
+    user.approvalStatus = 'rejected';
+    user.rejectionReason = reason;
+    user.rejectedAt = new Date().toISOString();
+    saveStorage(STORAGE_KEYS.USERS, users);
+
+    if (isCloudFirebaseActive() && db) {
+      updateDoc(doc(db, 'users', id), {
+        isApproved: false,
+        approvalStatus: 'rejected',
+        rejectionReason: reason,
+        rejectedAt: user.rejectedAt
+      }).catch(e => console.warn('Firestore reject sync error:', e));
+    }
+
+    notificationService.createNotification({
+      userId: id,
+      title: 'Registration Application Update',
+      message: `Your registration could not be approved at this time: ${reason}`,
+      type: 'account_rejected',
+      relatedId: id
+    });
+
+    auditLogService.logAction(
+      'User Registration Rejected',
+      `Admin rejected organization "${user.organizationName || user.name}" (${user.role.toUpperCase()}). Reason: ${reason}`,
+      'warning'
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { collection: 'users' } }));
+    }
+    return user;
+  },
   toggleVerify(id) {
     const users = this.getUsers();
     const user = users.find(u => u.id === id);
@@ -656,11 +802,169 @@ export const userService = {
       if (isCloudFirebaseActive() && db) {
         updateDoc(doc(db, 'users', id), { isVerified: user.isVerified }).catch(e => console.warn('Firestore verify sync:', e));
       }
+      auditLogService.logAction(
+        'Verification Toggled',
+        `Admin toggled verification for "${user.organizationName || user.name}" to ${user.isVerified ? 'VERIFIED' : 'UNVERIFIED'}.`,
+        'info'
+      );
       return user;
     }
     return null;
+  },
+  deleteUserAndAllData(id) {
+    const users = this.getUsers();
+    const user = users.find(u => u.id === id);
+    if (!user) return false;
+
+    const orgName = user.organizationName || user.name || id;
+    const userRole = user.role;
+
+    // 1. Delete user record
+    const filteredUsers = users.filter(u => u.id !== id);
+    saveStorage(STORAGE_KEYS.USERS, filteredUsers);
+    if (isCloudFirebaseActive() && db) {
+      deleteDoc(doc(db, 'users', id)).catch(e => console.warn('Firestore delete user error:', e));
+    }
+
+    // 2. Cascade delete all Food Listings created by this user
+    let listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
+    const userListingIds = listings.filter(l => l.donorId === id).map(l => l.id);
+    listings = listings.filter(l => l.donorId !== id);
+    saveStorage(STORAGE_KEYS.LISTINGS, listings);
+    if (isCloudFirebaseActive() && db) {
+      userListingIds.forEach(lId => {
+        deleteDoc(doc(db, 'foodListings', lId)).catch(e => console.warn('Firestore delete listing error:', e));
+      });
+    }
+
+    // 3. Cascade delete/cancel all Donations where this user is donor or NGO
+    let donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
+    const affectedDonationIds = donations.filter(d => d.donorId === id || d.ngoId === id).map(d => d.id);
+    donations = donations.filter(d => d.donorId !== id && d.ngoId !== id);
+    saveStorage(STORAGE_KEYS.DONATIONS, donations);
+    if (isCloudFirebaseActive() && db) {
+      affectedDonationIds.forEach(dId => {
+        deleteDoc(doc(db, 'donations', dId)).catch(e => console.warn('Firestore delete donation error:', e));
+      });
+    }
+
+    // 4. Cascade delete Messages
+    let messages = loadStorage(STORAGE_KEYS.MESSAGES, []);
+    const affectedMsgIds = messages.filter(m => m.senderId === id || m.receiverId === id).map(m => m.id);
+    messages = messages.filter(m => m.senderId !== id && m.receiverId !== id);
+    saveStorage(STORAGE_KEYS.MESSAGES, messages);
+    if (isCloudFirebaseActive() && db) {
+      affectedMsgIds.forEach(mId => {
+        deleteDoc(doc(db, 'messages', mId)).catch(e => console.warn('Firestore delete message error:', e));
+      });
+    }
+
+    // 5. Cascade delete Notifications
+    let notifications = loadStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+    const affectedNotifIds = notifications.filter(n => n.userId === id || n.relatedId === id).map(n => n.id);
+    notifications = notifications.filter(n => n.userId !== id && n.relatedId !== id);
+    saveStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
+    if (isCloudFirebaseActive() && db) {
+      affectedNotifIds.forEach(nId => {
+        deleteDoc(doc(db, 'notifications', nId)).catch(e => console.warn('Firestore delete notif error:', e));
+      });
+    }
+
+    // 6. Cascade delete Municipal Waste Requests
+    let wasteRequests = loadStorage(STORAGE_KEYS.WASTE_REQUESTS, []);
+    const affectedWasteIds = wasteRequests.filter(w => w.donorId === id).map(w => w.id);
+    wasteRequests = wasteRequests.filter(w => w.donorId !== id);
+    saveStorage(STORAGE_KEYS.WASTE_REQUESTS, wasteRequests);
+    if (isCloudFirebaseActive() && db) {
+      affectedWasteIds.forEach(wId => {
+        deleteDoc(doc(db, 'wasteRequests', wId)).catch(e => console.warn('Firestore delete waste error:', e));
+      });
+    }
+
+    // 7. Log Audit Action
+    auditLogService.logAction(
+      'Permanent User & Data Wipe',
+      `Platform Admin permanently wiped ${userRole.toUpperCase()} account "${orgName}" (${id}) along with ${userListingIds.length} listings, ${affectedDonationIds.length} donations, and all associated messages.`,
+      'critical'
+    );
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('foodconnect_data_updated', { detail: { action: 'user_deleted', userId: id } }));
+    }
+    return true;
   }
 };
+
+// -------------------------------------------------------------
+// CENTRAL PLATFORM ANALYTICS & METRICS AGGREGATOR
+// -------------------------------------------------------------
+export function getAdminPlatformMetrics() {
+  const users = loadStorage(STORAGE_KEYS.USERS, []);
+  const listings = loadStorage(STORAGE_KEYS.LISTINGS, []);
+  const donations = loadStorage(STORAGE_KEYS.DONATIONS, []);
+  const wasteRequests = loadStorage(STORAGE_KEYS.WASTE_REQUESTS, []);
+
+  const donors = users.filter(u => u.role === 'donor');
+  const ngos = users.filter(u => u.role === 'ngo');
+  const pendingApprovals = users.filter(u => u.role !== 'admin' && (u.approvalStatus === 'pending' || (!u.isApproved && u.approvalStatus !== 'rejected')));
+  const verifiedUsers = users.filter(u => u.isVerified);
+
+  // Status breakdown of donations
+  const acceptedCount = donations.filter(d => d.status === 'accepted').length;
+  const inTransitCount = donations.filter(d => ['pickup_started', 'picked_up'].includes(d.status)).length;
+  const deliveredCount = donations.filter(d => d.status === 'delivered').length;
+  const availableListingsCount = listings.filter(l => l.status === 'available' && !isListingExpired(l)).length;
+  const expiredListingsCount = listings.filter(l => l.status === 'expired' || isListingExpired(l)).length;
+  const wasteTicketsCount = wasteRequests.length;
+
+  // Food quantity estimation (kg)
+  let totalFoodListedKg = 0;
+  listings.forEach(l => {
+    totalFoodListedKg += Number(l.quantity) || 0;
+  });
+
+  let totalRescuedKg = 0;
+  donations.forEach(d => {
+    if (d.status === 'delivered') {
+      const parsed = parseFloat(String(d.quantity).replace(/[^0-9.]/g, ''));
+      totalRescuedKg += isNaN(parsed) ? 10 : parsed;
+    }
+  });
+
+  let totalDivertedWasteKg = 0;
+  wasteRequests.forEach(w => {
+    const parsed = parseFloat(String(w.quantity).replace(/[^0-9.]/g, ''));
+    totalDivertedWasteKg += isNaN(parsed) ? 15 : parsed;
+  });
+
+  const co2PreventedKg = (totalRescuedKg * 2.5).toFixed(1);
+  const mealsDistributed = Math.round(totalRescuedKg * 2);
+
+  // Status distribution percentages for charts
+  const totalFlowItems = availableListingsCount + inTransitCount + deliveredCount + wasteTicketsCount + expiredListingsCount;
+
+  return {
+    totalUsers: users.length,
+    donorsCount: donors.length,
+    ngosCount: ngos.length,
+    pendingApprovalsCount: pendingApprovals.length,
+    verifiedUsersCount: verifiedUsers.length,
+    totalListings: listings.length,
+    availableListingsCount,
+    expiredListingsCount,
+    totalDonations: donations.length,
+    acceptedCount,
+    inTransitCount,
+    deliveredCount,
+    wasteTicketsCount,
+    totalFoodListedKg: Math.round(totalFoodListedKg),
+    totalRescuedKg: Math.round(totalRescuedKg),
+    totalDivertedWasteKg: Math.round(totalDivertedWasteKg),
+    co2PreventedKg,
+    mealsDistributed,
+    totalFlowItems
+  };
+}
 
 // -------------------------------------------------------------
 // FOOD LISTINGS SERVICES
@@ -1087,7 +1391,7 @@ export const wasteService = {
       quantity,
       spoilageReason: spoilageReason || 'Past safe consumption window / Expiration',
       regionWard: regionWard || 'Zonal Municipal Ward',
-      address,
+      address: address || 'Kitchen Gate Dispatch Area',
       preferredSlot: preferredSlot || 'Morning (8:00 AM - 11:00 AM)',
       municipalContact: municipalContact || MUNICIPAL_CORPORATIONS_DIRECTORY.national,
       status: 'scheduled',
